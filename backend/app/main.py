@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.calendar import router as calendar_router
+from app.api.debug import router as debug_router
 from app.api.health import router as health_router
 from app.api.rag import router as rag_router
 from app.api.voice import router as voice_router
@@ -60,6 +61,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(calendar_router, prefix="/api")
+    app.include_router(debug_router, prefix="/api")
     app.include_router(rag_router, prefix="/api")
     app.include_router(voice_router, prefix="/api")
     return app

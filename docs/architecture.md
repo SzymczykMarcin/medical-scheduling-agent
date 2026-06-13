@@ -25,6 +25,7 @@ flowchart LR
 - Scheduling service owns office hours, seeded appointments, and slot selection.
 - SMS service formats a short confirmation message.
 - Storage layer keeps demo calendar data.
+- Debug API exposes a developer-only direct-vs-RAG diagnostic response without persisting raw transcripts or model outputs.
 
 ## Frontend Routes
 
@@ -46,6 +47,10 @@ RAG backend selection is explicit through `RAG_BACKEND`:
 Markdown/TXT/CSV/JSONL files under `data/rag` are source documents, not the retrieval backend. Structured medical rules are validated first and then indexed into a vector store before `RAG_BACKEND=chroma` can retrieve them semantically.
 
 The backend does not silently fall back from one RAG backend to another. If `RAG_BACKEND=chroma` is selected and the Chroma store is missing, the request fails with a clear backend error instead of using non-vector retrieval.
+
+## Debug Diagnostics
+
+`POST /api/debug/appointment-analysis` accepts a text transcript and returns the direct Bielik output, retrieved RAG context, raw RAG Bielik output, validated intent, scheduler result, and SMS text. This endpoint is intended for development and QA. Logs should contain only metadata such as transcript length, retrieved passage count, and scheduler status.
 
 ## Model Loading Strategy
 
