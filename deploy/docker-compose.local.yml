@@ -1,0 +1,44 @@
+services:
+  bielik-model:
+    build:
+      context: ./ollama-bielik
+      args:
+        MODEL: ${BIELIK_OLLAMA_MODEL:-SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0}
+    image: medical-scheduling-bielik-model:local
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_MODELS: /models
+      OLLAMA_KEEP_ALIVE: "-1"
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}
+    ports:
+      - "${BIELIK_OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - bielik-models:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  embedding-model:
+    build:
+      context: ./ollama-embedding
+      args:
+        MODEL: ${EMBEDDING_OLLAMA_MODEL:-embeddinggemma:latest}
+    image: medical-scheduling-embedding-model:local
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_MODELS: /models
+      OLLAMA_KEEP_ALIVE: "-1"
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}
+    ports:
+      - "${EMBEDDING_OLLAMA_PORT:-11435}:11434"
+    volumes:
+      - embedding-models:/models
+
+volumes:
+  bielik-models:
+  embedding-models:
+
