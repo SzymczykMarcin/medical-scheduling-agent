@@ -1,0 +1,4 @@
+procedure_name,specialty,duration_minutes,duration_rationale,patient_preparation,contraindications_for_auto_booking,source
+EKG spoczynkowe,Diagnostyka,30,Krótka rejestracja badania i przygotowanie pacjenta,Luźne ubranie ułatwiające dostęp do klatki piersiowej,"ból w klatce piersiowej teraz; duszność",Demo diagnostyka
+USG jamy brzusznej,Diagnostyka,30,Standardowe badanie obrazowe z opisem,W zależności od zaleceń placówki pacjent może wymagać bycia na czczo,"ostry brzuch; silny nagły ból",Demo diagnostyka
+Spirometria,Diagnostyka,30,Badanie oddechowe z instruktażem technicznym,Unikanie intensywnego wysiłku bezpośrednio przed badaniem,"duszność spoczynkowa; świeża infekcja z gorączką",Demo diagnostyka

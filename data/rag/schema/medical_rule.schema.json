@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Medical scheduling rule",
+  "type": "object",
+  "required": [
+    "procedure_name",
+    "specialty",
+    "duration_minutes",
+    "duration_rationale"
+  ],
+  "properties": {
+    "procedure_name": {
+      "type": "string",
+      "minLength": 2
+    },
+    "specialty": {
+      "type": "string",
+      "minLength": 2
+    },
+    "duration_minutes": {
+      "type": "integer",
+      "description": "Raw duration in minutes. The backend normalizes values up to 30, 60, 90, or 120.",
+      "minimum": 1,
+      "maximum": 120
+    },
+    "duration_rationale": {
+      "type": "string",
+      "minLength": 2
+    },
+    "patient_preparation": {
+      "type": ["string", "null"]
+    },
+    "contraindications_for_auto_booking": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        {
+          "type": "string",
+          "description": "Semicolon-separated text is accepted in CSV and Markdown."
+        }
+      ]
+    },
+    "source": {
+      "type": ["string", "null"]
+    }
+  },
+  "additionalProperties": false
+}

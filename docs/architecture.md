@@ -34,7 +34,7 @@ flowchart LR
 
 ## Demo Data
 
-The calendar starts with deterministic seed appointments. Expert RAG files live under `data/rag` and should be plain Markdown or text documents describing appointment categories, durations, and scheduling rules.
+The calendar starts with deterministic seed appointments. Expert RAG source files live under `data/rag` and may be Markdown, text, CSV, or JSONL documents describing appointment categories, durations, and scheduling rules.
 
 ## RAG Backend Strategy
 
@@ -43,7 +43,7 @@ RAG backend selection is explicit through `RAG_BACKEND`:
 - `chroma`: local semantic vector search with ChromaDB and sentence-transformers.
 - `bigquery-vector`: cloud vector-search extension point. It is configured but not implemented yet.
 
-Markdown/TXT files under `data/rag` are source documents, not the retrieval backend. They must be indexed into a vector store before `RAG_BACKEND=chroma` can retrieve them semantically.
+Markdown/TXT/CSV/JSONL files under `data/rag` are source documents, not the retrieval backend. Structured medical rules are validated first and then indexed into a vector store before `RAG_BACKEND=chroma` can retrieve them semantically.
 
 The backend does not silently fall back from one RAG backend to another. If `RAG_BACKEND=chroma` is selected and the Chroma store is missing, the request fails with a clear backend error instead of using non-vector retrieval.
 

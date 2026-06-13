@@ -7,6 +7,7 @@ from app.api import rag
 from app.core.settings import Settings
 from app.main import app
 from app.services.exceptions import RagDataNotReadyError
+from app.services.medical_rules import SourceDocument
 from app.services.rag_ingestion import RagIngestionService, _chunk_document
 
 
@@ -15,8 +16,7 @@ def test_chunk_document_preserves_heading_and_overlaps(tmp_path: Path) -> None:
     text = "# Respiratory rules\n" + "A" * 40 + "\n" + "B" * 40
 
     chunks = _chunk_document(
-        document_path=document_path,
-        text=text,
+        document=SourceDocument(path=document_path, text=text, document_id="rules"),
         chunk_characters=45,
         chunk_overlap=10,
     )

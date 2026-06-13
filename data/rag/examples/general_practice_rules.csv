@@ -1,0 +1,4 @@
+procedure_name,specialty,duration_minutes,duration_rationale,patient_preparation,contraindications_for_auto_booking,source
+Konsultacja lekarza rodzinnego,POZ,30,Standardowa konsultacja objawowa i decyzja o dalszym postępowaniu,"Lista leków i dokumentacja dotychczasowego leczenia","ból w klatce piersiowej; duszność spoczynkowa; utrata przytomności",Demo POZ
+Kontrola leczenia przewlekłego,POZ,30,Omówienie wyników i modyfikacja leczenia przewlekłego,Aktualne wyniki badań i lista leków,"nagłe pogorszenie stanu; objawy alarmowe",Demo POZ
+Rozszerzona konsultacja internistyczna,POZ,60,Dłuższy wywiad i omówienie wielu problemów zdrowotnych,Dokumentacja medyczna i lista leków,"silny ból; objawy neurologiczne",Demo POZ

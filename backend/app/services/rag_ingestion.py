@@ -6,6 +6,7 @@ from typing import Any
 from app.core.settings import Settings, get_settings
 from app.models.ingestion import RagIngestionResponse
 from app.services.exceptions import RagAnalysisError, RagDataNotReadyError
+from app.services.medical_rules import MedicalRuleSourceLoader, SourceDocument
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +32,9 @@ class RagIngestionService:
         documents = self._load_documents()
         chunks = [
             chunk
-            for document_path, text in documents
+            for document in documents
             for chunk in _chunk_document(
-                document_path=document_path,
-                text=text,
+                document=document,
                 chunk_characters=self.settings.rag_chunk_characters,
                 chunk_overlap=self.settings.rag_chunk_overlap,
             )
@@ -66,21 +66,8 @@ class RagIngestionService:
             chunk_count=len(chunks),
         )
 
-    def _load_documents(self) -> list[tuple[Path, str]]:
-        document_dir = Path(self.settings.rag_document_dir)
-        if not document_dir.exists():
-            raise RagDataNotReadyError(f"RAG document directory does not exist: {document_dir}")
-
-        documents: list[tuple[Path, str]] = []
-        for path in sorted([*document_dir.glob("*.md"), *document_dir.glob("*.txt")]):
-            text = path.read_text(encoding="utf-8").strip()
-            if text:
-                documents.append((path, text))
-
-        if not documents:
-            raise RagDataNotReadyError(f"No RAG source documents found in: {document_dir}")
-
-        return documents
+    def _load_documents(self) -> list[SourceDocument]:
+        return MedicalRuleSourceLoader(Path(self.settings.rag_document_dir)).load_documents()
 
     def _store_chunks(self, chunks: list[TextChunk]) -> None:
         try:
@@ -121,13 +108,13 @@ def _reset_collection(client: Any, collection_name: str) -> None:
 
 
 def _chunk_document(
-    document_path: Path,
-    text: str,
+    document: SourceDocument,
     chunk_characters: int,
     chunk_overlap: int,
 ) -> list[TextChunk]:
-    heading = _first_heading(text)
-    normalized_text = "\n".join(line.rstrip() for line in text.splitlines()).strip()
+    heading = document.heading or _first_heading(document.text)
+    document_id = document.document_id or document.path.stem
+    normalized_text = "\n".join(line.rstrip() for line in document.text.splitlines()).strip()
     chunks: list[TextChunk] = []
     start = 0
     index = 0
@@ -138,9 +125,9 @@ def _chunk_document(
         if content:
             chunks.append(
                 TextChunk(
-                    id=f"{document_path.stem}-{index}",
+                    id=f"{document_id}-{index}",
                     content=content,
-                    source_path=str(document_path),
+                    source_path=str(document.path),
                     heading=heading,
                 )
             )

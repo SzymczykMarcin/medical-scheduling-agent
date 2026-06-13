@@ -24,6 +24,7 @@ Build a local-first demo system for scheduling medical appointments from Polish 
 
 - The backend analyzes the transcript in Polish.
 - The RAG pipeline retrieves appointment duration and scheduling guidance from the explicitly configured knowledge backend.
+- The RAG ingestion pipeline validates structured medical rules before creating vector-search chunks.
 - The LLM extracts structured appointment intent:
   - visit reason,
   - urgency level for scheduling purposes,
@@ -106,6 +107,21 @@ Use GGUF builds and `llama.cpp` because they are practical for local Windows dem
 | `bigquery-vector` | Cloud vector-search extension point | Configured, not implemented |
 
 Backend selection must be explicit. The system must not silently switch from a broken vector store to non-vector retrieval, because that would hide configuration failures during testing. Markdown/TXT files are source documents for ingestion, not a replacement for vector retrieval.
+
+## Medical Rule Source Formats
+
+Active medical rules may be provided as Markdown, CSV, or JSONL under `data/rag/`.
+Structured sources use:
+
+- `procedure_name`
+- `specialty`
+- `duration_minutes`
+- `duration_rationale`
+- `patient_preparation`
+- `contraindications_for_auto_booking`
+- `source`
+
+The ingestion pipeline normalizes `duration_minutes` up to one of `30`, `60`, `90`, or `120` before embedding the rule text.
 
 ### Transcription
 
