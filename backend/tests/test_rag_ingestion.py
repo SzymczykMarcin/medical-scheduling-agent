@@ -39,24 +39,31 @@ def test_ingestion_reports_missing_document_directory(tmp_path: Path) -> None:
         service.rebuild_index()
 
 
-def test_file_backend_ingestion_validates_documents_without_vector_index(tmp_path: Path) -> None:
+def test_chroma_backend_ingestion_stores_vector_chunks(tmp_path: Path, monkeypatch) -> None:
     rag_dir = tmp_path / "rag"
     rag_dir.mkdir()
     (rag_dir / "rules.md").write_text("# Rules\nKonsultacja trwa 30 minut.", encoding="utf-8")
+    stored_chunk_counts: list[int] = []
+
+    def fake_store_chunks(self, chunks):
+        stored_chunk_counts.append(len(chunks))
+
+    monkeypatch.setattr(RagIngestionService, "_store_chunks", fake_store_chunks)
     service = RagIngestionService(
         Settings(
-            rag_backend="file",
+            rag_backend="chroma",
             rag_document_dir=str(rag_dir),
-            chroma_persist_dir=str(tmp_path / "unused-chroma"),
+            chroma_persist_dir=str(tmp_path / "chroma"),
+            chroma_collection_name="medical_scheduling_rules",
         )
     )
 
     response = service.rebuild_index()
 
-    assert response.collection_name == "file"
+    assert response.collection_name == "medical_scheduling_rules"
     assert response.document_count == 1
     assert response.chunk_count == 1
-    assert not (tmp_path / "unused-chroma").exists()
+    assert stored_chunk_counts == [1]
 
 
 def test_rag_ingestion_endpoint_maps_missing_data_to_bad_request(monkeypatch) -> None:

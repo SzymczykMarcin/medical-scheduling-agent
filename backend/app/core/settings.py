@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     ollama_timeout_seconds: float = 120.0
 
     embedding_model_name: str = "sdadas/mmlw-retrieval-roberta-large"
-    rag_backend: Literal["file", "chroma", "bigquery-vector"] = "file"
+    rag_backend: Literal["chroma", "bigquery-vector"] = "chroma"
     chroma_persist_dir: str = str(PROJECT_ROOT / "data" / "chroma")
     chroma_collection_name: str = "medical_scheduling_rules"
     bigquery_project_id: str | None = None

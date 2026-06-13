@@ -40,11 +40,12 @@ The calendar starts with deterministic seed appointments. Expert RAG files live 
 
 RAG backend selection is explicit through `RAG_BACKEND`:
 
-- `file`: deterministic local Markdown/TXT retrieval for simple demos.
-- `chroma`: local vector search with ChromaDB and sentence-transformers.
+- `chroma`: local semantic vector search with ChromaDB and sentence-transformers.
 - `bigquery-vector`: cloud vector-search extension point. It is configured but not implemented yet.
 
-The backend does not silently fall back from one RAG backend to another. If `RAG_BACKEND=chroma` is selected and the Chroma store is missing, the request fails with a clear backend error instead of using file retrieval.
+Markdown/TXT files under `data/rag` are source documents, not the retrieval backend. They must be indexed into a vector store before `RAG_BACKEND=chroma` can retrieve them semantically.
+
+The backend does not silently fall back from one RAG backend to another. If `RAG_BACKEND=chroma` is selected and the Chroma store is missing, the request fails with a clear backend error instead of using non-vector retrieval.
 
 ## Model Loading Strategy
 
@@ -53,6 +54,6 @@ The application starts in mock mode by default. Real model loading should be laz
 - ASR model is loaded on first transcription request.
 - Bielik model is loaded on first RAG analysis request when `LLM_PROVIDER=llama-cpp`.
 - Bielik is called through HTTP when `LLM_PROVIDER=ollama-http`.
-- Embedding model and ChromaDB index are initialized only when `RAG_BACKEND=chroma` requires them.
+- Embedding model and ChromaDB index are initialized when RAG ingestion or retrieval requires them.
 
 This keeps startup fast and makes local demos possible before model files are available.

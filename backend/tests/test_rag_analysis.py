@@ -10,8 +10,6 @@ from app.services.rag_prompting import SchedulingPromptBuilder
 from app.services.rag_retrieval import (
     BigQueryVectorKnowledgeBaseRetriever,
     ChromaKnowledgeBaseRetriever,
-    FileKnowledgeBaseRetriever,
-    KnowledgeBaseRetriever,
     create_knowledge_base_retriever,
 )
 
@@ -24,9 +22,9 @@ class FakeRetriever:
         self.queries.append(f"{query}|{limit}")
         return [
             RetrievedPassage(
-                content="Infekcja gardła i gorączka zwykle wymagają 30 minut konsultacji POZ.",
+                content="Respiratory infection usually requires a 30 minute appointment.",
                 source_path="rules.md",
-                heading="Konsultacje podstawowe POZ",
+                heading="Primary care consultations",
             )
         ]
 
@@ -47,7 +45,7 @@ def test_rag_analysis_returns_structured_intent() -> None:
         """
         ```json
         {
-          "visit_reason": "Ból gardła i gorączka",
+          "visit_reason": "Bol gardla i goraczka",
           "procedure_hint": "Konsultacja POZ",
           "preferred_time": "wtorek po 10",
           "preferred_days": ["2026-06-11"],
@@ -60,7 +58,7 @@ def test_rag_analysis_returns_structured_intent() -> None:
           "duration_minutes": 30,
           "confidence": 0.82,
           "requires_human_callback": false,
-          "explanation": "Reguła RAG wskazuje standardową konsultację POZ."
+          "explanation": "Regula RAG wskazuje standardowa konsultacje POZ."
         }
         ```
         """
@@ -78,12 +76,12 @@ def test_rag_analysis_returns_structured_intent() -> None:
     )
 
     assert intent.duration_minutes == 30
-    assert intent.visit_reason == "Ból gardła i gorączka"
+    assert intent.visit_reason == "Bol gardla i goraczka"
     assert intent.preferred_days == ["2026-06-09"]
     assert intent.preferred_time_windows[0].date is None
     assert intent.specific_datetime is None
     assert retriever.queries == ["Boli mnie gardlo i mam goraczke. Prosze o wtorek po 10.|3"]
-    assert "Infekcja gardła" in llm.messages[-1].content
+    assert "Respiratory infection" in llm.messages[-1].content
     assert "2026-06-09 10:30 - 12:00" in llm.messages[-1].content
 
 
@@ -103,20 +101,20 @@ def test_prompt_builder_limits_context_size() -> None:
     messages = builder.build_messages(
         transcript="Test transcript",
         retrieved_passages=[
-            RetrievedPassage(content="krótka reguła", source_path="first.md"),
+            RetrievedPassage(content="short rule", source_path="first.md"),
             RetrievedPassage(content="x" * 200, source_path="second.md"),
         ],
         availability_summary="- 2026-06-09 10:30 - 12:00",
         today="2026-06-08",
     )
 
-    assert "krótka reguła" in messages[-1].content
+    assert "short rule" in messages[-1].content
     assert "2026-06-09 10:30 - 12:00" in messages[-1].content
     assert "second.md" not in messages[-1].content
 
 
 def test_retriever_reports_missing_vector_store(tmp_path) -> None:
-    retriever = KnowledgeBaseRetriever(
+    retriever = ChromaKnowledgeBaseRetriever(
         Settings(
             rag_backend="chroma",
             chroma_persist_dir=str(tmp_path / "missing-chroma"),
@@ -139,7 +137,7 @@ def test_retriever_wraps_chroma_client_startup_failure(tmp_path, monkeypatch) ->
     import chromadb
 
     monkeypatch.setattr(chromadb, "PersistentClient", failing_persistent_client)
-    retriever = KnowledgeBaseRetriever(
+    retriever = ChromaKnowledgeBaseRetriever(
         Settings(
             rag_backend="chroma",
             chroma_persist_dir=str(chroma_dir),
@@ -149,18 +147,6 @@ def test_retriever_wraps_chroma_client_startup_failure(tmp_path, monkeypatch) ->
 
     with pytest.raises(RagDataNotReadyError, match="could not be opened"):
         retriever.retrieve("query")
-
-
-def test_retriever_factory_selects_file_backend(tmp_path) -> None:
-    rag_dir = tmp_path / "rag"
-    rag_dir.mkdir()
-    (rag_dir / "rules.md").write_text("# Rules\nKonsultacja trwa 30 minut.", encoding="utf-8")
-
-    retriever = create_knowledge_base_retriever(
-        Settings(rag_backend="file", rag_document_dir=str(rag_dir))
-    )
-
-    assert isinstance(retriever, FileKnowledgeBaseRetriever)
 
 
 def test_retriever_factory_selects_chroma_backend(tmp_path) -> None:
@@ -177,47 +163,68 @@ def test_retriever_factory_selects_bigquery_vector_backend() -> None:
     assert isinstance(retriever, BigQueryVectorKnowledgeBaseRetriever)
 
 
-def test_file_retriever_orders_passages_by_keyword_score(tmp_path) -> None:
-    rag_dir = tmp_path / "rag"
-    rag_dir.mkdir()
-    (rag_dir / "a.md").write_text(
-        "# Pierwsze\nRutynowa konsultacja internistyczna trwa 30 minut.",
-        encoding="utf-8",
+def test_chroma_retriever_queries_vector_store_with_embedding(tmp_path) -> None:
+    chroma_dir = tmp_path / "chroma"
+    chroma_dir.mkdir()
+    (chroma_dir / "chroma.sqlite3").write_text("", encoding="utf-8")
+
+    class FakeEmbedding:
+        def encode(self, query: str, normalize_embeddings: bool):
+            assert query == "headache consultation"
+            assert normalize_embeddings is True
+            return FakeVector([0.1, 0.2, 0.3])
+
+    class FakeVector(list):
+        def tolist(self):
+            return list(self)
+
+    class FakeCollection:
+        def __init__(self) -> None:
+            self.n_results: int | None = None
+
+        def query(self, query_embeddings, n_results: int, include):
+            assert query_embeddings == [[0.1, 0.2, 0.3]]
+            assert include == ["documents", "metadatas", "distances"]
+            self.n_results = n_results
+            return {
+                "documents": [["Neurology consultation usually takes 60 minutes."]],
+                "metadatas": [[{"source_path": "rules.md", "heading": "Neurology"}]],
+                "distances": [[0.12]],
+            }
+
+    retriever = ChromaKnowledgeBaseRetriever(
+        Settings(
+            rag_backend="chroma",
+            chroma_persist_dir=str(chroma_dir),
+            chroma_collection_name="medical_scheduling_rules",
+        )
     )
-    (rag_dir / "b.md").write_text(
-        "# Drugie\nBól głowy i konsultacja neurologiczna zwykle trwają 60 minut.",
-        encoding="utf-8",
-    )
+    collection = FakeCollection()
+    retriever._embedding_model = FakeEmbedding()
+    retriever._collection = collection
 
-    retriever = FileKnowledgeBaseRetriever(
-        Settings(rag_backend="file", rag_document_dir=str(rag_dir), retrieval_limit=2)
-    )
+    passages = retriever.retrieve("headache consultation", limit=1)
 
-    passages = retriever.retrieve("Ból głowy konsultacja neurologiczna", limit=2)
-
-    assert passages[0].heading == "Drugie"
-    assert passages[1].heading == "Pierwsze"
+    assert collection.n_results == 1
+    assert passages[0].content == "Neurology consultation usually takes 60 minutes."
+    assert passages[0].heading == "Neurology"
+    assert passages[0].distance == 0.12
 
 
-def test_chroma_backend_does_not_fall_back_to_file_when_store_is_missing(tmp_path) -> None:
-    rag_dir = tmp_path / "rag"
-    rag_dir.mkdir()
-    (rag_dir / "rules.md").write_text("# Rules\nKonsultacja trwa 30 minut.", encoding="utf-8")
-
+def test_chroma_backend_does_not_fall_back_when_store_is_missing(tmp_path) -> None:
     retriever = create_knowledge_base_retriever(
         Settings(
             rag_backend="chroma",
-            rag_document_dir=str(rag_dir),
             chroma_persist_dir=str(tmp_path / "missing-chroma"),
         )
     )
 
     with pytest.raises(RagDataNotReadyError, match="not ready"):
-        retriever.retrieve("konsultacja", limit=1)
+        retriever.retrieve("consultation", limit=1)
 
 
 def test_bigquery_vector_backend_reports_missing_project_id() -> None:
     retriever = BigQueryVectorKnowledgeBaseRetriever(Settings(rag_backend="bigquery-vector"))
 
     with pytest.raises(RagDataNotReadyError, match="BIGQUERY_PROJECT_ID"):
-        retriever.retrieve("konsultacja")
+        retriever.retrieve("consultation")

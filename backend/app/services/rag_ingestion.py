@@ -45,14 +45,7 @@ class RagIngestionService:
                 f"No RAG chunks found in document directory: {self.settings.rag_document_dir}"
             )
 
-        if self.settings.rag_backend == "file":
-            collection_name = "file"
-            logger.info(
-                "RAG ingestion validated file backend documents=%s chunks=%s",
-                len(documents),
-                len(chunks),
-            )
-        elif self.settings.rag_backend == "chroma":
+        if self.settings.rag_backend == "chroma":
             self._store_chunks(chunks)
             collection_name = self.settings.chroma_collection_name
         elif self.settings.rag_backend == "bigquery-vector":

@@ -102,11 +102,10 @@ Use GGUF builds and `llama.cpp` because they are practical for local Windows dem
 
 | Backend | Purpose | Status |
 | --- | --- | --- |
-| `file` | Local Markdown/TXT demo retrieval | Default |
-| `chroma` | Local vector search | Supported |
+| `chroma` | Local semantic vector search | Default |
 | `bigquery-vector` | Cloud vector-search extension point | Configured, not implemented |
 
-Backend selection must be explicit. The system must not silently switch from a broken vector store to file retrieval, because that would hide configuration failures during testing.
+Backend selection must be explicit. The system must not silently switch from a broken vector store to non-vector retrieval, because that would hide configuration failures during testing. Markdown/TXT files are source documents for ingestion, not a replacement for vector retrieval.
 
 ### Transcription
 

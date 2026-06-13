@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -19,8 +19,6 @@ class RetrieverProtocol(Protocol):
 def create_knowledge_base_retriever(settings: Settings | None = None) -> RetrieverProtocol:
     """Create the explicitly configured RAG retrieval backend."""
     resolved_settings = settings or get_settings()
-    if resolved_settings.rag_backend == "file":
-        return FileKnowledgeBaseRetriever(resolved_settings)
     if resolved_settings.rag_backend == "chroma":
         return ChromaKnowledgeBaseRetriever(resolved_settings)
     if resolved_settings.rag_backend == "bigquery-vector":
@@ -149,62 +147,6 @@ def _map_chroma_results(results: dict[str, Any]) -> list[RetrievedPassage]:
     return passages
 
 
-class FileKnowledgeBaseRetriever:
-    """Retrieve RAG context directly from local markdown and text files."""
-
-    def __init__(self, settings: Settings | None = None) -> None:
-        self.settings = settings or get_settings()
-        self._passages: list[RetrievedPassage] | None = None
-
-    def retrieve(self, query: str, limit: int | None = None) -> list[RetrievedPassage]:
-        """Return relevant passages using deterministic keyword scoring."""
-        selected_limit = limit or self.settings.retrieval_limit
-        logger.info(
-            "Starting RAG retrieval backend=file query_chars=%s limit=%s document_dir=%s",
-            len(query),
-            selected_limit,
-            self.settings.rag_document_dir,
-        )
-        passages = self._load_passages()
-        scored = [
-            (score, index, passage)
-            for index, passage in enumerate(passages)
-            if (score := _keyword_score(query, passage.content)) > 0
-        ]
-
-        if not scored:
-            scored = [(0, index, passage) for index, passage in enumerate(passages)]
-
-        scored.sort(key=lambda item: (-item[0], item[1]))
-        selected = [passage for _score, _index, passage in scored[:selected_limit]]
-        logger.info(
-            "RAG retrieval completed backend=file passages=%s sources=%s",
-            len(selected),
-            _source_labels(selected),
-        )
-        return selected
-
-    def _load_passages(self) -> list[RetrievedPassage]:
-        if self._passages is None:
-            document_dir = Path(self.settings.rag_document_dir)
-            if not document_dir.exists():
-                raise RagDataNotReadyError(f"RAG document directory does not exist: {document_dir}")
-
-            passages: list[RetrievedPassage] = []
-            for path in sorted([*document_dir.glob("*.md"), *document_dir.glob("*.txt")]):
-                text = path.read_text(encoding="utf-8").strip()
-                if not text:
-                    continue
-                passages.extend(_split_document_into_passages(path, text))
-
-            if not passages:
-                raise RagDataNotReadyError(f"No RAG source documents found in: {document_dir}")
-
-            self._passages = passages
-
-        return self._passages
-
-
 class BigQueryVectorKnowledgeBaseRetriever:
     """Extension point for cloud vector retrieval through BigQuery Vector Search."""
 
@@ -228,58 +170,6 @@ class BigQueryVectorKnowledgeBaseRetriever:
         raise RagDataNotReadyError("BigQuery vector retrieval is not implemented yet.")
 
 
-# Backward-compatible alias for older imports.
-KnowledgeBaseRetriever = ChromaKnowledgeBaseRetriever
-
-
-def _split_document_into_passages(path: Path, text: str) -> list[RetrievedPassage]:
-    sections: list[RetrievedPassage] = []
-    current_heading: str | None = None
-    current_lines: list[str] = []
-
-    def flush() -> None:
-        content = "\n".join(current_lines).strip()
-        if content:
-            sections.append(
-                RetrievedPassage(
-                    content=content,
-                    source_path=str(path),
-                    heading=current_heading,
-                    distance=None,
-                    section_slug=_slugify(current_heading or path.stem),
-                )
-            )
-
-    for line in text.splitlines():
-        if line.startswith("#"):
-            flush()
-            current_heading = line.lstrip("#").strip() or None
-            current_lines = [line]
-        else:
-            current_lines.append(line)
-
-    flush()
-    return sections
-
-
-def _keyword_score(query: str, content: str) -> int:
-    query_tokens = _tokens(query)
-    content_tokens = set(_tokens(content))
-    return sum(1 for token in query_tokens if token in content_tokens)
-
-
-def _tokens(value: str) -> list[str]:
-    import re
-
-    return [token for token in re.findall(r"[\wąćęłńóśźż]+", value.lower()) if len(token) >= 3]
-
-
-def _slugify(value: str) -> str:
-    import re
-
-    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
-
-
 def _source_labels(passages: list[RetrievedPassage]) -> list[str]:
     return [
         passage.heading
@@ -288,3 +178,4 @@ def _source_labels(passages: list[RetrievedPassage]) -> list[str]:
         or "unknown"
         for passage in passages
     ]
+
