@@ -206,6 +206,23 @@ tempCodeRunnerFile.py
 # Ruff stuff:
 .ruff_cache/
 
+# JavaScript / frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Local AI model weights and generated local data
+models/**/*.gguf
+models/**/*.bin
+models/**/*.safetensors
+models/**/snapshots/
+data/chroma/
+data/*.sqlite3
+data/samples/*
+!data/samples/.gitkeep
+reports/
+
 # PyPI configuration file
 .pypirc
 
