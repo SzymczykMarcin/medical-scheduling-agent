@@ -4,7 +4,13 @@ import pytest
 
 from app.core.settings import Settings
 from app.models.rag import ConversationMessage
-from app.services.bielik import BielikLlmService, format_chatml
+from app.services.bielik import (
+    BielikLlmService,
+    LlamaCppBielikProvider,
+    OllamaHttpBielikProvider,
+    create_bielik_provider,
+    format_chatml,
+)
 from app.services.exceptions import LlmGenerationError
 
 
@@ -63,4 +69,103 @@ def test_bielik_service_fails_when_model_file_is_missing(tmp_path: Path) -> None
     )
 
     with pytest.raises(LlmGenerationError, match="does not exist"):
+        service.generate([ConversationMessage(role="user", content="Hello")])
+
+
+def test_provider_selection_uses_llama_cpp_for_default_provider(tmp_path: Path) -> None:
+    model_path = tmp_path / "model.gguf"
+    model_path.write_bytes(b"fake")
+
+    provider = create_bielik_provider(
+        settings=Settings(bielik_gguf_path=str(model_path)),
+        model_factory=lambda _path, _settings: FakeLlamaModel(),
+    )
+
+    assert isinstance(provider, LlamaCppBielikProvider)
+
+
+def test_provider_selection_uses_ollama_http_without_loading_model() -> None:
+    def fake_post(_url: str, _payload: dict, _timeout: float) -> dict:
+        return {"message": {"content": "Ollama response"}}
+
+    provider = create_bielik_provider(
+        settings=Settings(llm_provider="ollama-http"),
+        model_factory=lambda _path, _settings: pytest.fail("llama.cpp factory must not be used"),
+        ollama_post=fake_post,
+    )
+
+    assert isinstance(provider, OllamaHttpBielikProvider)
+
+
+def test_ollama_provider_posts_chat_payload_and_returns_content() -> None:
+    calls: list[tuple[str, dict, float]] = []
+
+    def fake_post(url: str, payload: dict, timeout: float) -> dict:
+        calls.append((url, payload, timeout))
+        return {"message": {"content": "Gotowe<|im_end|>"}}
+
+    service = BielikLlmService(
+        settings=Settings(
+            llm_provider="ollama-http",
+            ollama_base_url="http://127.0.0.1:11434/",
+            ollama_model="bielik:test",
+            ollama_timeout_seconds=7,
+            llm_max_new_tokens=64,
+            llm_temperature=0.3,
+        ),
+        ollama_post=fake_post,
+    )
+
+    response = service.generate(
+        [
+            ConversationMessage(role="system", content="System"),
+            ConversationMessage(role="user", content="Cześć"),
+        ]
+    )
+
+    assert response == "Gotowe"
+    assert calls[0][0] == "http://127.0.0.1:11434/api/chat"
+    assert calls[0][2] == 7
+    assert calls[0][1]["model"] == "bielik:test"
+    assert calls[0][1]["stream"] is False
+    assert calls[0][1]["messages"] == [
+        {"role": "system", "content": "System"},
+        {"role": "user", "content": "Cześć"},
+    ]
+    assert calls[0][1]["options"] == {"temperature": 0.3, "num_predict": 64}
+
+
+def test_ollama_provider_rejects_malformed_response() -> None:
+    service = BielikLlmService(
+        settings=Settings(llm_provider="ollama-http"),
+        ollama_post=lambda _url, _payload, _timeout: {"message": {"unexpected": "value"}},
+    )
+
+    with pytest.raises(LlmGenerationError, match="unexpected response shape"):
+        service.generate([ConversationMessage(role="user", content="Hello")])
+
+
+def test_ollama_provider_wraps_http_transport_errors() -> None:
+    def failing_post(_url: str, _payload: dict, _timeout: float) -> dict:
+        raise OSError("network down")
+
+    service = BielikLlmService(
+        settings=Settings(llm_provider="ollama-http"),
+        ollama_post=failing_post,
+    )
+
+    with pytest.raises(LlmGenerationError, match="Ollama generation failed"):
+        service.generate([ConversationMessage(role="user", content="Hello")])
+
+
+def test_ollama_provider_preserves_controlled_generation_errors() -> None:
+    def failing_post(_url: str, _payload: dict, _timeout: float) -> dict:
+        raise LlmGenerationError("Ollama HTTP request timed out.")
+
+    service = BielikLlmService(
+        settings=Settings(llm_provider="ollama-http"),
+        ollama_post=failing_post,
+    )
+
+    with pytest.raises(LlmGenerationError, match="timed out"):
         service.generate([ConversationMessage(role="user", content="Hello")])

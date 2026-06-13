@@ -16,6 +16,8 @@ The exact filenames do not matter as long as `.env` points to them.
 
 ## Bielik Setup
 
+### llama.cpp provider
+
 This project can reuse the already downloaded GGUF model from the `interactive-cv` project:
 
 ```text
@@ -32,6 +34,20 @@ LLM_GPU_LAYERS=-1
 ```
 
 The RAG data remains separate for this project. Only the GGUF model file is reused.
+
+### Ollama HTTP provider
+
+Use this mode when Bielik is served by a local or remote Ollama-compatible model server.
+The backend will not load GGUF weights into its own process.
+
+```env
+LLM_PROVIDER=ollama-http
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0
+OLLAMA_TIMEOUT_SECONDS=120
+```
+
+The provider calls `POST /api/chat` with `stream: false`.
 
 ## Whisper Setup
 

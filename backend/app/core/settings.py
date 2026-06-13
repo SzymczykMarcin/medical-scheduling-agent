@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,7 +30,7 @@ class Settings(BaseSettings):
     asr_compute_type: str = "int8_float16"
     max_audio_upload_mb: int = 50
 
-    llm_provider: str = "llama-cpp"
+    llm_provider: Literal["llama-cpp", "ollama-http"] = "llama-cpp"
     bielik_gguf_path: str = (
         "C:/009_Firma/safe_space/interactive-cv/models/bielik-minitron-7b-q4/"
         "minitron-Bielik-7B-v3.0-Instruct-GGUF.Q4_K_M.gguf"
@@ -39,6 +40,9 @@ class Settings(BaseSettings):
     llm_threads: int | None = None
     llm_max_new_tokens: int = 512
     llm_temperature: float = 0.1
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    ollama_model: str = "SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0"
+    ollama_timeout_seconds: float = 120.0
 
     embedding_model_name: str = "sdadas/mmlw-retrieval-roberta-large"
     rag_backend: str = "file"
