@@ -54,11 +54,13 @@ The backend does not silently fall back from one RAG backend to another. If `RAG
 
 ## Model Loading Strategy
 
-The application starts in mock mode by default. Real model loading should be lazy:
+The default local profile uses real providers and fails visibly when a required
+model server, ASR runtime, or vector RAG index is missing. Model loading should
+be lazy:
 
 - ASR model is loaded on first transcription request.
-- Bielik model is loaded on first RAG analysis request when `LLM_PROVIDER=llama-cpp`.
 - Bielik is called through HTTP when `LLM_PROVIDER=ollama-http`.
+- Bielik model is loaded on first RAG analysis request when `LLM_PROVIDER=llama-cpp`.
 - Embedding model and ChromaDB index are initialized when RAG ingestion or retrieval requires them.
 
-This keeps startup fast and makes local demos possible before model files are available.
+This keeps startup fast while avoiding silent fallback behavior during manual tests.

@@ -17,7 +17,6 @@ Build a local-first demo system for scheduling medical appointments from Polish 
 
 - The backend transcribes Polish speech locally.
 - The transcription service exposes a stable interface around the chosen local model.
-- MVP transcription can run in mock mode.
 - Target implementation uses `faster-whisper` with `large-v3-turbo`.
 
 ### Text analysis and RAG
@@ -31,7 +30,8 @@ Build a local-first demo system for scheduling medical appointments from Polish 
   - preferred date/time,
   - estimated visit duration,
   - short explanation.
-- Target LLM uses either a local quantized Bielik model through `llama-cpp-python` or an explicit Ollama-compatible HTTP model server.
+- Target LLM uses an explicit Ollama-compatible HTTP model server for the standard profiles.
+- A local quantized Bielik model through `llama-cpp-python` remains a supported advanced option.
 
 ### Scheduling
 
@@ -57,7 +57,7 @@ Build a local-first demo system for scheduling medical appointments from Polish 
 
 - Runs on a single developer PC.
 - Keeps AI model paths, model server URLs, and RAG backends configurable by environment variables.
-- Supports mock mode only for early development before local models are downloaded.
+- Supports demo mode only for intentional UI/backend development without real inference.
 - Avoids sending patient audio or text to external services.
 - Uses English documentation and code comments.
 - Keeps medical claims conservative: the assistant schedules visits, it does not diagnose.
@@ -69,8 +69,8 @@ Build a local-first demo system for scheduling medical appointments from Polish 
 - `pydantic-settings`: typed environment configuration.
 - `python-multipart`: multipart audio uploads.
 - `faster-whisper`: local Whisper inference using CTranslate2.
-- `llama-cpp-python`: local GGUF Bielik inference.
-- Ollama-compatible HTTP API: optional Bielik model-server mode.
+- Ollama-compatible HTTP API: default Bielik model-server mode.
+- `llama-cpp-python`: optional local GGUF Bielik inference.
 - `chromadb`: optional local vector store for RAG.
 - `sentence-transformers`: local embedding model runtime.
 - `sqlmodel`: lightweight SQLite persistence for demo appointments.
@@ -95,9 +95,12 @@ Target model:
 
 | Model | Quantization | Runtime |
 | --- | --- | --- |
-| Bielik Minitron 7B v3.0 Instruct | GGUF Q4_K_M | llama.cpp / llama-cpp-python |
+| SpeakLeash Bielik 4.5B v3.0 Instruct | Q8_0 | Ollama-compatible HTTP API |
+| Bielik Minitron 7B v3.0 Instruct | GGUF Q4_K_M | Optional llama.cpp / llama-cpp-python |
 
-Use GGUF builds and `llama.cpp` because they are practical for local Windows demos and allow CPU/GPU mixed inference. Use `LLM_PROVIDER=ollama-http` when Bielik is served by a local or cloud model server.
+Use `LLM_PROVIDER=ollama-http` for the default local and cloud profiles. Use GGUF
+builds and `llama.cpp` only when you explicitly want the backend process to load
+the model directly.
 
 ## RAG Backend Choices
 

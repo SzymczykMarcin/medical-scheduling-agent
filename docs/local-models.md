@@ -22,7 +22,9 @@ models/
     ...
 ```
 
-The exact filenames do not matter as long as `.env` points to them.
+The exact filenames do not matter as long as `.env` points to them. The standard
+local profile uses Ollama HTTP, so GGUF files are optional and only needed when
+you explicitly choose `LLM_PROVIDER=llama-cpp`.
 
 ## Bielik Setup
 
@@ -64,18 +66,19 @@ ASR_DEVICE=cuda
 ASR_COMPUTE_TYPE=int8_float16
 ```
 
-## Mock Mode
+## Demo Mode
 
-Keep this enabled until models are downloaded and configured:
-
-```env
-DEMO_MODE=true
-```
-
-Disable it when real inference is ready:
+The standard profiles keep demo mode disabled:
 
 ```env
 DEMO_MODE=false
+```
+
+Use demo mode only for isolated UI/backend development where real inference is
+intentionally not part of the test:
+
+```env
+DEMO_MODE=true
 ```
 
 ## References
