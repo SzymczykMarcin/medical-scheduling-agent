@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     )
 
     demo_mode: bool = False
+    runtime_profile: Literal["local-ollama", "cloud-run", "custom"] = "local-ollama"
     cors_origins_raw: str = Field(
         default=(
             "http://localhost:5173,http://127.0.0.1:5173,"
@@ -30,11 +31,8 @@ class Settings(BaseSettings):
     asr_compute_type: str = "int8_float16"
     max_audio_upload_mb: int = 50
 
-    llm_provider: Literal["llama-cpp", "ollama-http"] = "llama-cpp"
-    bielik_gguf_path: str = (
-        "C:/009_Firma/safe_space/interactive-cv/models/bielik-minitron-7b-q4/"
-        "minitron-Bielik-7B-v3.0-Instruct-GGUF.Q4_K_M.gguf"
-    )
+    llm_provider: Literal["llama-cpp", "ollama-http"] = "ollama-http"
+    bielik_gguf_path: str = ""
     llm_context_tokens: int = 4096
     llm_gpu_layers: int = -1
     llm_threads: int | None = None
@@ -58,6 +56,17 @@ class Settings(BaseSettings):
     rag_chunk_overlap: int = 180
 
     sqlite_database_url: str = f"sqlite:///{PROJECT_ROOT / 'data' / 'demo.sqlite3'}"
+
+    @model_validator(mode="after")
+    def validate_provider_configuration(self) -> "Settings":
+        """Validate selected provider configuration without exposing secrets."""
+        if self.llm_provider == "llama-cpp" and not self.bielik_gguf_path.strip():
+            raise ValueError("BIELIK_GGUF_PATH is required when LLM_PROVIDER=llama-cpp.")
+        if self.llm_provider == "ollama-http" and not self.ollama_base_url.strip():
+            raise ValueError("OLLAMA_BASE_URL is required when LLM_PROVIDER=ollama-http.")
+        if self.rag_backend == "bigquery-vector" and not self.bigquery_project_id:
+            raise ValueError("BIGQUERY_PROJECT_ID is required when RAG_BACKEND=bigquery-vector.")
+        return self
 
     @property
     def cors_origins(self) -> list[str]:

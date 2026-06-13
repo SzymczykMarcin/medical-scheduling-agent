@@ -1,5 +1,15 @@
 # Local Models
 
+## Runtime Profile
+
+For the supported local setup, copy:
+
+```powershell
+copy .env.example.local-ollama .env
+```
+
+This configures the backend to call Bielik through a local Ollama-compatible server instead of loading a GGUF file inside the backend process.
+
 ## Directory Convention
 
 Place local models outside Git tracking:
@@ -18,22 +28,16 @@ The exact filenames do not matter as long as `.env` points to them.
 
 ### llama.cpp provider
 
-This project can reuse the already downloaded GGUF model from the `interactive-cv` project:
-
-```text
-C:/009_Firma/safe_space/interactive-cv/models/bielik-minitron-7b-q4/minitron-Bielik-7B-v3.0-Instruct-GGUF.Q4_K_M.gguf
-```
-
-Configure:
+The public runtime profiles do not use local GGUF paths. If you explicitly choose `LLM_PROVIDER=llama-cpp`, set `BIELIK_GGUF_PATH` to your own local model file:
 
 ```env
 LLM_PROVIDER=llama-cpp
-BIELIK_GGUF_PATH=C:/009_Firma/safe_space/interactive-cv/models/bielik-minitron-7b-q4/minitron-Bielik-7B-v3.0-Instruct-GGUF.Q4_K_M.gguf
+BIELIK_GGUF_PATH=path/to/your/bielik-model.gguf
 LLM_CONTEXT_TOKENS=4096
 LLM_GPU_LAYERS=-1
 ```
 
-The RAG data remains separate for this project. Only the GGUF model file is reused.
+The RAG data remains separate for this project.
 
 ### Ollama HTTP provider
 

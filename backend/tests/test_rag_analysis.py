@@ -158,7 +158,9 @@ def test_retriever_factory_selects_chroma_backend(tmp_path) -> None:
 
 
 def test_retriever_factory_selects_bigquery_vector_backend() -> None:
-    retriever = create_knowledge_base_retriever(Settings(rag_backend="bigquery-vector"))
+    retriever = create_knowledge_base_retriever(
+        Settings(rag_backend="bigquery-vector", bigquery_project_id="demo-project")
+    )
 
     assert isinstance(retriever, BigQueryVectorKnowledgeBaseRetriever)
 
@@ -223,8 +225,10 @@ def test_chroma_backend_does_not_fall_back_when_store_is_missing(tmp_path) -> No
         retriever.retrieve("consultation", limit=1)
 
 
-def test_bigquery_vector_backend_reports_missing_project_id() -> None:
-    retriever = BigQueryVectorKnowledgeBaseRetriever(Settings(rag_backend="bigquery-vector"))
+def test_bigquery_vector_backend_reports_not_implemented_with_project_id() -> None:
+    retriever = BigQueryVectorKnowledgeBaseRetriever(
+        Settings(rag_backend="bigquery-vector", bigquery_project_id="demo-project")
+    )
 
-    with pytest.raises(RagDataNotReadyError, match="BIGQUERY_PROJECT_ID"):
+    with pytest.raises(RagDataNotReadyError, match="not implemented"):
         retriever.retrieve("consultation")

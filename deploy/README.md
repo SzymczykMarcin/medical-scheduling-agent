@@ -10,6 +10,14 @@ OLLAMA_BASE_URL=http://127.0.0.1:11434
 OLLAMA_MODEL=SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0
 ```
 
+For local development, copy:
+
+```bash
+cp .env.example.local-ollama .env
+```
+
+For Cloud Run, use `.env.example.cloud-run` as the backend environment template.
+
 ## Local Docker Compose
 
 Start the Bielik model server:

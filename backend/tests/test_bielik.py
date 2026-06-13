@@ -49,6 +49,7 @@ def test_bielik_service_uses_model_factory_and_strips_stop_marker(tmp_path: Path
         return fake_model
 
     settings = Settings(
+        llm_provider="llama-cpp",
         bielik_gguf_path=str(model_path),
         llm_max_new_tokens=128,
         llm_temperature=0.2,
@@ -64,7 +65,10 @@ def test_bielik_service_uses_model_factory_and_strips_stop_marker(tmp_path: Path
 
 def test_bielik_service_fails_when_model_file_is_missing(tmp_path: Path) -> None:
     service = BielikLlmService(
-        settings=Settings(bielik_gguf_path=str(tmp_path / "missing.gguf")),
+        settings=Settings(
+            llm_provider="llama-cpp",
+            bielik_gguf_path=str(tmp_path / "missing.gguf"),
+        ),
         model_factory=lambda _path, _settings: FakeLlamaModel(),
     )
 
@@ -72,12 +76,12 @@ def test_bielik_service_fails_when_model_file_is_missing(tmp_path: Path) -> None
         service.generate([ConversationMessage(role="user", content="Hello")])
 
 
-def test_provider_selection_uses_llama_cpp_for_default_provider(tmp_path: Path) -> None:
+def test_provider_selection_uses_llama_cpp_when_configured(tmp_path: Path) -> None:
     model_path = tmp_path / "model.gguf"
     model_path.write_bytes(b"fake")
 
     provider = create_bielik_provider(
-        settings=Settings(bielik_gguf_path=str(model_path)),
+        settings=Settings(llm_provider="llama-cpp", bielik_gguf_path=str(model_path)),
         model_factory=lambda _path, _settings: FakeLlamaModel(),
     )
 
