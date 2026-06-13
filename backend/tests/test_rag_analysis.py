@@ -7,7 +7,13 @@ from app.models.rag import ConversationMessage, RetrievedPassage
 from app.services.exceptions import RagAnalysisError, RagDataNotReadyError
 from app.services.rag import RagAnalysisService
 from app.services.rag_prompting import SchedulingPromptBuilder
-from app.services.rag_retrieval import FileKnowledgeBaseRetriever, KnowledgeBaseRetriever, ResilientKnowledgeBaseRetriever
+from app.services.rag_retrieval import (
+    BigQueryVectorKnowledgeBaseRetriever,
+    ChromaKnowledgeBaseRetriever,
+    FileKnowledgeBaseRetriever,
+    KnowledgeBaseRetriever,
+    create_knowledge_base_retriever,
+)
 
 
 class FakeRetriever:
@@ -112,6 +118,7 @@ def test_prompt_builder_limits_context_size() -> None:
 def test_retriever_reports_missing_vector_store(tmp_path) -> None:
     retriever = KnowledgeBaseRetriever(
         Settings(
+            rag_backend="chroma",
             chroma_persist_dir=str(tmp_path / "missing-chroma"),
             chroma_collection_name="medical_scheduling_rules",
         )
@@ -134,6 +141,7 @@ def test_retriever_wraps_chroma_client_startup_failure(tmp_path, monkeypatch) ->
     monkeypatch.setattr(chromadb, "PersistentClient", failing_persistent_client)
     retriever = KnowledgeBaseRetriever(
         Settings(
+            rag_backend="chroma",
             chroma_persist_dir=str(chroma_dir),
             chroma_collection_name="medical_scheduling_rules",
         )
@@ -143,24 +151,73 @@ def test_retriever_wraps_chroma_client_startup_failure(tmp_path, monkeypatch) ->
         retriever.retrieve("query")
 
 
-def test_resilient_retriever_uses_file_fallback_when_chroma_fails(tmp_path, monkeypatch) -> None:
+def test_retriever_factory_selects_file_backend(tmp_path) -> None:
     rag_dir = tmp_path / "rag"
     rag_dir.mkdir()
-    (rag_dir / "rules.md").write_text(
-        "# Konsultacje\nBól głowy i rutynowa konsultacja lekarza rodzinnego trwają 30 minut.",
+    (rag_dir / "rules.md").write_text("# Rules\nKonsultacja trwa 30 minut.", encoding="utf-8")
+
+    retriever = create_knowledge_base_retriever(
+        Settings(rag_backend="file", rag_document_dir=str(rag_dir))
+    )
+
+    assert isinstance(retriever, FileKnowledgeBaseRetriever)
+
+
+def test_retriever_factory_selects_chroma_backend(tmp_path) -> None:
+    retriever = create_knowledge_base_retriever(
+        Settings(rag_backend="chroma", chroma_persist_dir=str(tmp_path / "chroma"))
+    )
+
+    assert isinstance(retriever, ChromaKnowledgeBaseRetriever)
+
+
+def test_retriever_factory_selects_bigquery_vector_backend() -> None:
+    retriever = create_knowledge_base_retriever(Settings(rag_backend="bigquery-vector"))
+
+    assert isinstance(retriever, BigQueryVectorKnowledgeBaseRetriever)
+
+
+def test_file_retriever_orders_passages_by_keyword_score(tmp_path) -> None:
+    rag_dir = tmp_path / "rag"
+    rag_dir.mkdir()
+    (rag_dir / "a.md").write_text(
+        "# Pierwsze\nRutynowa konsultacja internistyczna trwa 30 minut.",
+        encoding="utf-8",
+    )
+    (rag_dir / "b.md").write_text(
+        "# Drugie\nBól głowy i konsultacja neurologiczna zwykle trwają 60 minut.",
         encoding="utf-8",
     )
 
-    class FailingRetriever:
-        def retrieve(self, query: str, limit: int | None = None):
-            raise RagDataNotReadyError("Chroma unavailable.")
+    retriever = FileKnowledgeBaseRetriever(
+        Settings(rag_backend="file", rag_document_dir=str(rag_dir), retrieval_limit=2)
+    )
 
-    settings = Settings(rag_document_dir=str(rag_dir), retrieval_limit=2)
-    retriever = ResilientKnowledgeBaseRetriever(settings)
-    retriever.primary = FailingRetriever()
-    retriever.fallback = FileKnowledgeBaseRetriever(settings)
+    passages = retriever.retrieve("Ból głowy konsultacja neurologiczna", limit=2)
 
-    passages = retriever.retrieve("Boli mnie głowa. Potrzebuję konsultacji.", limit=1)
+    assert passages[0].heading == "Drugie"
+    assert passages[1].heading == "Pierwsze"
 
-    assert len(passages) == 1
-    assert "Ból głowy" in passages[0].content
+
+def test_chroma_backend_does_not_fall_back_to_file_when_store_is_missing(tmp_path) -> None:
+    rag_dir = tmp_path / "rag"
+    rag_dir.mkdir()
+    (rag_dir / "rules.md").write_text("# Rules\nKonsultacja trwa 30 minut.", encoding="utf-8")
+
+    retriever = create_knowledge_base_retriever(
+        Settings(
+            rag_backend="chroma",
+            rag_document_dir=str(rag_dir),
+            chroma_persist_dir=str(tmp_path / "missing-chroma"),
+        )
+    )
+
+    with pytest.raises(RagDataNotReadyError, match="not ready"):
+        retriever.retrieve("konsultacja", limit=1)
+
+
+def test_bigquery_vector_backend_reports_missing_project_id() -> None:
+    retriever = BigQueryVectorKnowledgeBaseRetriever(Settings(rag_backend="bigquery-vector"))
+
+    with pytest.raises(RagDataNotReadyError, match="BIGQUERY_PROJECT_ID"):
+        retriever.retrieve("konsultacja")

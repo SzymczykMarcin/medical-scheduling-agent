@@ -21,7 +21,7 @@ class TextChunk:
 
 
 class RagIngestionService:
-    """Build a Chroma RAG index from local scheduling documents."""
+    """Prepare RAG source documents for the configured backend."""
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
@@ -45,15 +45,30 @@ class RagIngestionService:
                 f"No RAG chunks found in document directory: {self.settings.rag_document_dir}"
             )
 
-        self._store_chunks(chunks)
+        if self.settings.rag_backend == "file":
+            collection_name = "file"
+            logger.info(
+                "RAG ingestion validated file backend documents=%s chunks=%s",
+                len(documents),
+                len(chunks),
+            )
+        elif self.settings.rag_backend == "chroma":
+            self._store_chunks(chunks)
+            collection_name = self.settings.chroma_collection_name
+        elif self.settings.rag_backend == "bigquery-vector":
+            raise RagDataNotReadyError("BigQuery vector ingestion is not implemented yet.")
+        else:
+            raise RagDataNotReadyError(f"Unsupported RAG backend: {self.settings.rag_backend}")
+
         logger.info(
-            "RAG ingestion completed collection=%s documents=%s chunks=%s",
-            self.settings.chroma_collection_name,
+            "RAG ingestion completed backend=%s collection=%s documents=%s chunks=%s",
+            self.settings.rag_backend,
+            collection_name,
             len(documents),
             len(chunks),
         )
         return RagIngestionResponse(
-            collection_name=self.settings.chroma_collection_name,
+            collection_name=collection_name,
             document_count=len(documents),
             chunk_count=len(chunks),
         )

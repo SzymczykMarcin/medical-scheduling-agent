@@ -13,7 +13,7 @@ from app.services.bielik import BielikLlmService
 from app.services.exceptions import RagAnalysisError
 from app.services.intent_postprocessing import apply_polish_weekday_sanity_checks
 from app.services.rag_prompting import SchedulingPromptBuilder
-from app.services.rag_retrieval import ResilientKnowledgeBaseRetriever
+from app.services.rag_retrieval import create_knowledge_base_retriever
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class RagAnalysisService:
         prompt_builder: SchedulingPromptBuilder | None = None,
     ) -> None:
         self.settings = settings or get_settings()
-        self.retriever = retriever or ResilientKnowledgeBaseRetriever(self.settings)
+        self.retriever = retriever or create_knowledge_base_retriever(self.settings)
         self.llm = llm or BielikLlmService(self.settings)
         self.prompt_builder = prompt_builder or SchedulingPromptBuilder(
             max_context_characters=self.settings.rag_max_context_characters,

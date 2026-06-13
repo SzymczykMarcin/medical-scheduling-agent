@@ -23,14 +23,14 @@ Build a local-first demo system for scheduling medical appointments from Polish 
 ### Text analysis and RAG
 
 - The backend analyzes the transcript in Polish.
-- The RAG pipeline retrieves appointment duration and scheduling guidance from local expert documents.
+- The RAG pipeline retrieves appointment duration and scheduling guidance from the explicitly configured knowledge backend.
 - The LLM extracts structured appointment intent:
   - visit reason,
   - urgency level for scheduling purposes,
   - preferred date/time,
   - estimated visit duration,
   - short explanation.
-- Target LLM uses a local quantized Bielik model through `llama-cpp-python`.
+- Target LLM uses either a local quantized Bielik model through `llama-cpp-python` or an explicit Ollama-compatible HTTP model server.
 
 ### Scheduling
 
@@ -55,7 +55,7 @@ Build a local-first demo system for scheduling medical appointments from Polish 
 ## Non-Functional Requirements
 
 - Runs on a single developer PC.
-- Keeps AI model paths configurable by environment variables.
+- Keeps AI model paths, model server URLs, and RAG backends configurable by environment variables.
 - Supports mock mode only for early development before local models are downloaded.
 - Avoids sending patient audio or text to external services.
 - Uses English documentation and code comments.
@@ -69,7 +69,8 @@ Build a local-first demo system for scheduling medical appointments from Polish 
 - `python-multipart`: multipart audio uploads.
 - `faster-whisper`: local Whisper inference using CTranslate2.
 - `llama-cpp-python`: local GGUF Bielik inference.
-- `chromadb`: local vector store for RAG.
+- Ollama-compatible HTTP API: optional Bielik model-server mode.
+- `chromadb`: optional local vector store for RAG.
 - `sentence-transformers`: local embedding model runtime.
 - `sqlmodel`: lightweight SQLite persistence for demo appointments.
 - `ruff`: linting and formatting.
@@ -95,7 +96,17 @@ Target model:
 | --- | --- | --- |
 | Bielik Minitron 7B v3.0 Instruct | GGUF Q4_K_M | llama.cpp / llama-cpp-python |
 
-Use GGUF builds and `llama.cpp` because they are practical for local Windows demos and allow CPU/GPU mixed inference.
+Use GGUF builds and `llama.cpp` because they are practical for local Windows demos and allow CPU/GPU mixed inference. Use `LLM_PROVIDER=ollama-http` when Bielik is served by a local or cloud model server.
+
+## RAG Backend Choices
+
+| Backend | Purpose | Status |
+| --- | --- | --- |
+| `file` | Local Markdown/TXT demo retrieval | Default |
+| `chroma` | Local vector search | Supported |
+| `bigquery-vector` | Cloud vector-search extension point | Configured, not implemented |
+
+Backend selection must be explicit. The system must not silently switch from a broken vector store to file retrieval, because that would hide configuration failures during testing.
 
 ### Transcription
 

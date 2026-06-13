@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from app.core.settings import Settings, get_settings
 from app.models.rag import RetrievedPassage
@@ -9,7 +9,27 @@ from app.services.exceptions import RagAnalysisError, RagDataNotReadyError
 logger = logging.getLogger(__name__)
 
 
-class KnowledgeBaseRetriever:
+class RetrieverProtocol(Protocol):
+    """Common interface for RAG retrieval backends."""
+
+    def retrieve(self, query: str, limit: int | None = None) -> list[RetrievedPassage]:
+        """Return passages relevant to a transcript or user query."""
+
+
+def create_knowledge_base_retriever(settings: Settings | None = None) -> RetrieverProtocol:
+    """Create the explicitly configured RAG retrieval backend."""
+    resolved_settings = settings or get_settings()
+    if resolved_settings.rag_backend == "file":
+        return FileKnowledgeBaseRetriever(resolved_settings)
+    if resolved_settings.rag_backend == "chroma":
+        return ChromaKnowledgeBaseRetriever(resolved_settings)
+    if resolved_settings.rag_backend == "bigquery-vector":
+        return BigQueryVectorKnowledgeBaseRetriever(resolved_settings)
+
+    raise RagDataNotReadyError(f"Unsupported RAG backend: {resolved_settings.rag_backend}")
+
+
+class ChromaKnowledgeBaseRetriever:
     """Retrieve scheduling guidance from the local Chroma vector store."""
 
     def __init__(self, settings: Settings | None = None) -> None:
@@ -20,6 +40,13 @@ class KnowledgeBaseRetriever:
 
     def retrieve(self, query: str, limit: int | None = None) -> list[RetrievedPassage]:
         """Return passages relevant to a transcript or user query."""
+        selected_limit = limit or self.settings.retrieval_limit
+        logger.info(
+            "Starting RAG retrieval backend=chroma query_chars=%s limit=%s collection=%s",
+            len(query),
+            selected_limit,
+            self.settings.chroma_collection_name,
+        )
         self._ensure_vector_store_exists()
         collection = self._get_collection()
         query_embedding = self._get_embedding_model().encode(
@@ -30,7 +57,7 @@ class KnowledgeBaseRetriever:
         try:
             results = collection.query(
                 query_embeddings=[query_embedding],
-                n_results=limit or self.settings.retrieval_limit,
+                n_results=selected_limit,
                 include=["documents", "metadatas", "distances"],
             )
         except Exception as exc:
@@ -39,8 +66,9 @@ class KnowledgeBaseRetriever:
 
         passages = _map_chroma_results(results)
         logger.info(
-            "RAG retrieval completed passages=%s collection=%s",
+            "RAG retrieval completed backend=chroma passages=%s sources=%s collection=%s",
             len(passages),
+            _source_labels(passages),
             self.settings.chroma_collection_name,
         )
         return passages
@@ -122,7 +150,7 @@ def _map_chroma_results(results: dict[str, Any]) -> list[RetrievedPassage]:
 
 
 class FileKnowledgeBaseRetriever:
-    """Retrieve RAG context directly from local markdown files when Chroma is unavailable."""
+    """Retrieve RAG context directly from local markdown and text files."""
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
@@ -130,6 +158,13 @@ class FileKnowledgeBaseRetriever:
 
     def retrieve(self, query: str, limit: int | None = None) -> list[RetrievedPassage]:
         """Return relevant passages using deterministic keyword scoring."""
+        selected_limit = limit or self.settings.retrieval_limit
+        logger.info(
+            "Starting RAG retrieval backend=file query_chars=%s limit=%s document_dir=%s",
+            len(query),
+            selected_limit,
+            self.settings.rag_document_dir,
+        )
         passages = self._load_passages()
         scored = [
             (score, index, passage)
@@ -141,8 +176,12 @@ class FileKnowledgeBaseRetriever:
             scored = [(0, index, passage) for index, passage in enumerate(passages)]
 
         scored.sort(key=lambda item: (-item[0], item[1]))
-        selected = [passage for _score, _index, passage in scored[: limit or self.settings.retrieval_limit]]
-        logger.info("File RAG retrieval completed passages=%s", len(selected))
+        selected = [passage for _score, _index, passage in scored[:selected_limit]]
+        logger.info(
+            "RAG retrieval completed backend=file passages=%s sources=%s",
+            len(selected),
+            _source_labels(selected),
+        )
         return selected
 
     def _load_passages(self) -> list[RetrievedPassage]:
@@ -166,24 +205,31 @@ class FileKnowledgeBaseRetriever:
         return self._passages
 
 
-class ResilientKnowledgeBaseRetriever:
-    """Use Chroma first and fall back to file-based retrieval for local demo robustness."""
+class BigQueryVectorKnowledgeBaseRetriever:
+    """Extension point for cloud vector retrieval through BigQuery Vector Search."""
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
-        self.primary = KnowledgeBaseRetriever(self.settings)
-        self.fallback = FileKnowledgeBaseRetriever(self.settings)
 
     def retrieve(self, query: str, limit: int | None = None) -> list[RetrievedPassage]:
-        """Return RAG passages without failing the appointment flow on Chroma issues."""
-        if self.settings.rag_backend == "file":
-            return self.fallback.retrieve(query, limit=limit)
+        """Return passages from a cloud vector store when configured."""
+        logger.info(
+            "Starting RAG retrieval backend=bigquery-vector query_chars=%s limit=%s "
+            "dataset=%s table=%s",
+            len(query),
+            limit or self.settings.retrieval_limit,
+            self.settings.bigquery_dataset_id,
+            self.settings.bigquery_table_id,
+        )
+        if not self.settings.bigquery_project_id:
+            raise RagDataNotReadyError(
+                "BIGQUERY_PROJECT_ID is required when RAG_BACKEND=bigquery-vector."
+            )
+        raise RagDataNotReadyError("BigQuery vector retrieval is not implemented yet.")
 
-        try:
-            return self.primary.retrieve(query, limit=limit)
-        except Exception as exc:
-            logger.warning("Chroma RAG unavailable; using file RAG fallback. reason=%s", exc)
-            return self.fallback.retrieve(query, limit=limit)
+
+# Backward-compatible alias for older imports.
+KnowledgeBaseRetriever = ChromaKnowledgeBaseRetriever
 
 
 def _split_document_into_passages(path: Path, text: str) -> list[RetrievedPassage]:
@@ -232,3 +278,13 @@ def _slugify(value: str) -> str:
     import re
 
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+
+
+def _source_labels(passages: list[RetrievedPassage]) -> list[str]:
+    return [
+        passage.heading
+        or Path(passage.source_path).name
+        or passage.section_slug
+        or "unknown"
+        for passage in passages
+    ]

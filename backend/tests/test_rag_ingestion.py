@@ -39,6 +39,26 @@ def test_ingestion_reports_missing_document_directory(tmp_path: Path) -> None:
         service.rebuild_index()
 
 
+def test_file_backend_ingestion_validates_documents_without_vector_index(tmp_path: Path) -> None:
+    rag_dir = tmp_path / "rag"
+    rag_dir.mkdir()
+    (rag_dir / "rules.md").write_text("# Rules\nKonsultacja trwa 30 minut.", encoding="utf-8")
+    service = RagIngestionService(
+        Settings(
+            rag_backend="file",
+            rag_document_dir=str(rag_dir),
+            chroma_persist_dir=str(tmp_path / "unused-chroma"),
+        )
+    )
+
+    response = service.rebuild_index()
+
+    assert response.collection_name == "file"
+    assert response.document_count == 1
+    assert response.chunk_count == 1
+    assert not (tmp_path / "unused-chroma").exists()
+
+
 def test_rag_ingestion_endpoint_maps_missing_data_to_bad_request(monkeypatch) -> None:
     class RejectingIngestionService:
         def rebuild_index(self):
