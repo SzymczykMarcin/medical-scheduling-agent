@@ -20,7 +20,8 @@ does not send real SMS messages, and does not integrate with real clinic systems
 - Chroma vector RAG over medical scheduling rules from `data/rag`.
 - Deterministic scheduler that prevents silent calendar conflicts.
 - SQLite demo calendar storage.
-- Google Cloud Run deployment scripts for backend, frontend, and Bielik.
+- Google Cloud Run deployment scripts for frontend, backend, and GPU model
+  services.
 
 ## Repository Layout
 
@@ -202,13 +203,24 @@ This script performs the full demo deployment:
 2. Creates the backend service account if missing.
 3. Builds and deploys private Bielik/Ollama Cloud Run with NVIDIA L4 GPU.
 4. Grants the backend service account access to the private Bielik service.
-5. Builds and deploys the public FastAPI backend.
+5. Builds and deploys the public FastAPI backend with NVIDIA L4 GPU for ASR.
 6. Builds and deploys the public React frontend.
 7. Reconfigures backend CORS to the real frontend URL.
 8. Runs RAG ingestion.
 9. Runs model prewarm for Bielik and `faster-whisper`.
 10. Runs a basic smoke test.
 11. Prints backend, Bielik, and frontend URLs.
+
+The cloud demo uses two GPU-backed Cloud Run services:
+
+- `medical-scheduling-bielik`: private Bielik/Ollama service on NVIDIA L4.
+- `medical-scheduling-backend`: public FastAPI backend on NVIDIA L4, used by
+  `faster-whisper` ASR.
+
+Both services are deployed with `min-instances=0` and `max-instances=1`. This
+keeps the demo from holding an always-on GPU while idle, but the first request
+after idle can be slow because Cloud Run must start the container and load the
+models again.
 
 The first run can take a long time because Cloud Build pulls Bielik into the
 model image, RAG ingestion downloads the embedding model, and prewarm downloads

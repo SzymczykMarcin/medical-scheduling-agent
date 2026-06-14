@@ -233,6 +233,7 @@ reports/
 docs/
 docs/upgrade-plan/
 backend/logs/
+backend/tmp/
 *.tmp
 
 # PyPI configuration file

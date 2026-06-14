@@ -8,6 +8,7 @@ set -euo pipefail
 : "${EMBEDDING_MEMORY:=8Gi}"
 : "${EMBEDDING_CPU:=4}"
 : "${EMBEDDING_CONCURRENCY:=4}"
+: "${EMBEDDING_MIN_INSTANCES:=0}"
 : "${EMBEDDING_MAX_INSTANCES:=1}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,6 +24,7 @@ gcloud run deploy "${EMBEDDING_SERVICE}" \
   --memory "${EMBEDDING_MEMORY}" \
   --timeout 600 \
   --port 11434 \
+  --min-instances "${EMBEDDING_MIN_INSTANCES}" \
   --max-instances "${EMBEDDING_MAX_INSTANCES}" \
   --no-allow-unauthenticated \
   --set-env-vars "MODEL=${EMBEDDING_OLLAMA_MODEL},OLLAMA_NUM_PARALLEL=${EMBEDDING_CONCURRENCY},OLLAMA_KEEP_ALIVE=-1" \

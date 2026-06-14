@@ -57,11 +57,22 @@ gcloud run services add-iam-policy-binding "${BIELIK_SERVICE}" \
   --member "serviceAccount:${BACKEND_SERVICE_ACCOUNT_EMAIL}" \
   --role "roles/run.invoker"
 
+echo "Deploying GPU demo profile: Bielik on L4, backend ASR on L4, min instances 0, max instances 1."
+
 OLLAMA_BASE_URL="${BIELIK_URL}" \
 OLLAMA_AUTH_MODE="google-id-token" \
 BACKEND_SERVICE="${BACKEND_SERVICE}" \
 BACKEND_SERVICE_ACCOUNT_EMAIL="${BACKEND_SERVICE_ACCOUNT_EMAIL}" \
 FRONTEND_ORIGIN="${FRONTEND_ORIGIN}" \
+BACKEND_GPU_ENABLED="${BACKEND_GPU_ENABLED:-true}" \
+BACKEND_GPU_TYPE="${BACKEND_GPU_TYPE:-nvidia-l4}" \
+BACKEND_CPU="${BACKEND_CPU:-4}" \
+BACKEND_MEMORY="${BACKEND_MEMORY:-16Gi}" \
+BACKEND_CONCURRENCY="${BACKEND_CONCURRENCY:-1}" \
+BACKEND_MIN_INSTANCES="${BACKEND_MIN_INSTANCES:-0}" \
+BACKEND_MAX_INSTANCES="${BACKEND_MAX_INSTANCES:-1}" \
+ASR_DEVICE="${ASR_DEVICE:-cuda}" \
+ASR_COMPUTE_TYPE="${ASR_COMPUTE_TYPE:-int8_float16}" \
 "${SCRIPT_DIR}/backend-cloud-run.sh"
 
 BACKEND_URL="$(gcloud run services describe "${BACKEND_SERVICE}" \

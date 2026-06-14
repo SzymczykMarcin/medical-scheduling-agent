@@ -8,7 +8,9 @@ set -euo pipefail
 : "${BIELIK_MEMORY:=16Gi}"
 : "${BIELIK_CPU:=8}"
 : "${BIELIK_CONCURRENCY:=4}"
+: "${BIELIK_MIN_INSTANCES:=0}"
 : "${BIELIK_MAX_INSTANCES:=1}"
+: "${BIELIK_GPU_TYPE:=nvidia-l4}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_DIR="$(cd "${SCRIPT_DIR}/../ollama-bielik" && pwd)"
@@ -21,10 +23,11 @@ gcloud run deploy "${BIELIK_SERVICE}" \
   --concurrency "${BIELIK_CONCURRENCY}" \
   --cpu "${BIELIK_CPU}" \
   --gpu 1 \
-  --gpu-type nvidia-l4 \
+  --gpu-type "${BIELIK_GPU_TYPE}" \
   --memory "${BIELIK_MEMORY}" \
   --timeout 600 \
   --port 11434 \
+  --min-instances "${BIELIK_MIN_INSTANCES}" \
   --max-instances "${BIELIK_MAX_INSTANCES}" \
   --no-allow-unauthenticated \
   --no-cpu-throttling \

@@ -78,6 +78,7 @@ def test_cloud_run_scripts_are_parameterized() -> None:
         assert ": \"${REGION:?" in content
         assert "--source" in content
         assert "--no-allow-unauthenticated" in content
+        assert "--min-instances" in content
         assert "--labels \"app=medical-scheduling-agent" in content
         assert "C:/" not in content
         assert "C:\\" not in content
@@ -101,11 +102,25 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert ": \"${FRONTEND_ORIGIN:?" in content
     assert ": \"${OLLAMA_BASE_URL:?" in content
     assert "BACKEND_SERVICE_ACCOUNT_EMAIL" in content
+    assert ": \"${BACKEND_MEMORY:=16Gi}\"" in content
+    assert ": \"${BACKEND_CPU:=4}\"" in content
+    assert ": \"${BACKEND_CONCURRENCY:=1}\"" in content
+    assert ": \"${BACKEND_MIN_INSTANCES:=0}\"" in content
+    assert ": \"${BACKEND_MAX_INSTANCES:=1}\"" in content
+    assert ": \"${BACKEND_GPU_ENABLED:=true}\"" in content
+    assert ": \"${BACKEND_GPU_TYPE:=nvidia-l4}\"" in content
+    assert ": \"${ASR_DEVICE:=cuda}\"" in content
+    assert ": \"${ASR_COMPUTE_TYPE:=int8_float16}\"" in content
     assert "gcloud artifacts repositories describe" in content
     assert "gcloud artifacts repositories create" in content
     assert "gcloud builds submit" in content
     assert "gcloud run deploy" in content
     assert "--allow-unauthenticated" in content
+    assert "--gpu 1" in content
+    assert '--gpu-type "${BACKEND_GPU_TYPE}"' in content
+    assert "--no-cpu-throttling" in content
+    assert "--no-gpu-zonal-redundancy" in content
+    assert '--min-instances "${BACKEND_MIN_INSTANCES}"' in content
     assert "RUNTIME_PROFILE=cloud-run" in content
     assert "OLLAMA_AUTH_MODE=${OLLAMA_AUTH_MODE}" in content
     assert "ASR_DEVICE=${ASR_DEVICE}" in content
@@ -167,6 +182,12 @@ def test_demo_cloud_run_script_wires_private_model_to_public_backend() -> None:
     assert "gcloud run services add-iam-policy-binding" in content
     assert "roles/run.invoker" in content
     assert 'OLLAMA_AUTH_MODE="google-id-token"' in content
+    assert 'BACKEND_GPU_ENABLED="${BACKEND_GPU_ENABLED:-true}"' in content
+    assert 'BACKEND_GPU_TYPE="${BACKEND_GPU_TYPE:-nvidia-l4}"' in content
+    assert 'BACKEND_MIN_INSTANCES="${BACKEND_MIN_INSTANCES:-0}"' in content
+    assert 'BACKEND_MAX_INSTANCES="${BACKEND_MAX_INSTANCES:-1}"' in content
+    assert 'ASR_DEVICE="${ASR_DEVICE:-cuda}"' in content
+    assert 'ASR_COMPUTE_TYPE="${ASR_COMPUTE_TYPE:-int8_float16}"' in content
     assert "backend-cloud-run.sh" in content
     assert "frontend-cloud-run.sh" in content
     assert "gcloud run services update" in content

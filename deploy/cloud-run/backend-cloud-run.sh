@@ -10,13 +10,16 @@ set -euo pipefail
 : "${BACKEND_SERVICE_ACCOUNT_EMAIL:=}"
 : "${AR_REPOSITORY:=medical-scheduling-agent}"
 : "${BACKEND_IMAGE:=${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPOSITORY}/${BACKEND_SERVICE}:latest}"
-: "${BACKEND_MEMORY:=4Gi}"
-: "${BACKEND_CPU:=2}"
-: "${BACKEND_CONCURRENCY:=8}"
-: "${BACKEND_MAX_INSTANCES:=2}"
+: "${BACKEND_MEMORY:=16Gi}"
+: "${BACKEND_CPU:=4}"
+: "${BACKEND_CONCURRENCY:=1}"
+: "${BACKEND_MIN_INSTANCES:=0}"
+: "${BACKEND_MAX_INSTANCES:=1}"
+: "${BACKEND_GPU_ENABLED:=true}"
+: "${BACKEND_GPU_TYPE:=nvidia-l4}"
 : "${ASR_MODEL_NAME:=large-v3-turbo}"
-: "${ASR_DEVICE:=cpu}"
-: "${ASR_COMPUTE_TYPE:=int8}"
+: "${ASR_DEVICE:=cuda}"
+: "${ASR_COMPUTE_TYPE:=int8_float16}"
 : "${OLLAMA_MODEL:=SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0}"
 : "${OLLAMA_AUTH_MODE:=google-id-token}"
 : "${CALENDAR_STORAGE_BACKEND:=sqlite}"
@@ -46,15 +49,27 @@ if [ -n "${BACKEND_SERVICE_ACCOUNT_EMAIL}" ]; then
   service_account_args=(--service-account "${BACKEND_SERVICE_ACCOUNT_EMAIL}")
 fi
 
+gpu_args=()
+if [ "${BACKEND_GPU_ENABLED}" = "true" ]; then
+  gpu_args=(
+    --gpu 1
+    --gpu-type "${BACKEND_GPU_TYPE}"
+    --no-cpu-throttling
+    --no-gpu-zonal-redundancy
+  )
+fi
+
 gcloud run deploy "${BACKEND_SERVICE}" \
   --image "${BACKEND_IMAGE}" \
   --region "${REGION}" \
   --allow-unauthenticated \
   "${service_account_args[@]}" \
+  "${gpu_args[@]}" \
   --concurrency "${BACKEND_CONCURRENCY}" \
   --cpu "${BACKEND_CPU}" \
   --memory "${BACKEND_MEMORY}" \
   --timeout 600 \
+  --min-instances "${BACKEND_MIN_INSTANCES}" \
   --max-instances "${BACKEND_MAX_INSTANCES}" \
   --set-env-vars "RUNTIME_PROFILE=cloud-run,BACKEND_HOST=0.0.0.0,BACKEND_PORT=8080,CORS_ORIGINS=${FRONTEND_ORIGIN},DEMO_MODE=false,ASR_PROVIDER=faster-whisper,ASR_MODEL_NAME=${ASR_MODEL_NAME},ASR_DEVICE=${ASR_DEVICE},ASR_COMPUTE_TYPE=${ASR_COMPUTE_TYPE},LLM_PROVIDER=ollama-http,OLLAMA_BASE_URL=${OLLAMA_BASE_URL},OLLAMA_MODEL=${OLLAMA_MODEL},OLLAMA_AUTH_MODE=${OLLAMA_AUTH_MODE},RAG_BACKEND=${RAG_BACKEND},RAG_INDEX_MODE=${RAG_INDEX_MODE},BIGQUERY_PROJECT_ID=${BIGQUERY_PROJECT_ID},CHROMA_PERSIST_DIR=/tmp/medical-scheduling-agent/chroma,RAG_DOCUMENT_DIR=/app/data/rag,CALENDAR_STORAGE_BACKEND=${CALENDAR_STORAGE_BACKEND},SEED_DEMO_CALENDAR=true,CLOUD_STORAGE_MODE=${CLOUD_STORAGE_MODE},DATABASE_URL=${DATABASE_URL},SQLITE_DATABASE_URL=sqlite:////tmp/medical-scheduling-agent/demo.sqlite3" \
   --labels "app=medical-scheduling-agent,component=backend"
