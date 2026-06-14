@@ -119,9 +119,15 @@ def test_backend_dockerfile_contains_cloud_run_entrypoint() -> None:
     content = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
 
     assert "FROM python:3.12-slim" in content
+    assert "ENV VIRTUAL_ENV=/opt/venv" in content
+    assert 'ENV PATH="/opt/venv/bin:${PATH}"' in content
+    assert 'python -m venv "${VIRTUAL_ENV}"' in content
     assert "COPY backend/app" in content
     assert "COPY data/rag" in content
     assert 'python -m pip install ".[cloud]"' in content
+    assert "useradd --create-home" in content
+    assert "chown -R app:app /app /tmp/medical-scheduling-agent" in content
+    assert "USER app" in content
     assert "uvicorn app.main:app" in content
 
 
