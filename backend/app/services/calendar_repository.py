@@ -74,13 +74,15 @@ class CalendarEventRecord(SQLModel, table=True):
         )
 
 
-class SqliteCalendarRepository:
-    """SQLite-backed calendar repository for local and demo cloud persistence."""
+class SqlCalendarRepository:
+    """SQL-backed calendar repository for local SQLite and managed databases."""
 
     def __init__(self, database_url: str) -> None:
         self.database_url = database_url
-        self._ensure_sqlite_parent_exists(database_url)
-        self._engine = create_engine(database_url, connect_args={"check_same_thread": False})
+        url = make_url(database_url)
+        self._ensure_sqlite_parent_exists(url)
+        connect_args = {"check_same_thread": False} if url.drivername == "sqlite" else {}
+        self._engine = create_engine(database_url, connect_args=connect_args)
         SQLModel.metadata.create_all(self._engine)
 
     def list_events(self) -> list[CalendarEvent]:
@@ -100,8 +102,10 @@ class SqliteCalendarRepository:
             return session.exec(select(CalendarEventRecord.id).limit(1)).first() is None
 
     @staticmethod
-    def _ensure_sqlite_parent_exists(database_url: str) -> None:
-        url = make_url(database_url)
+    def _ensure_sqlite_parent_exists(url) -> None:
         if url.drivername != "sqlite" or not url.database or url.database == ":memory:":
             return
         Path(url.database).expanduser().parent.mkdir(parents=True, exist_ok=True)
+
+
+SqliteCalendarRepository = SqlCalendarRepository

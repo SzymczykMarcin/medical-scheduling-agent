@@ -148,18 +148,26 @@ def _map_chroma_results(results: dict[str, Any]) -> list[RetrievedPassage]:
 
 
 class BigQueryVectorKnowledgeBaseRetriever:
-    """Extension point for cloud vector retrieval through BigQuery Vector Search."""
+    """Retrieve scheduling guidance from BigQuery Vector Search."""
 
-    def __init__(self, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        bigquery_client: Any | None = None,
+        embedding_model: Any | None = None,
+    ) -> None:
         self.settings = settings or get_settings()
+        self._bigquery_client = bigquery_client
+        self._embedding_model = embedding_model
 
     def retrieve(self, query: str, limit: int | None = None) -> list[RetrievedPassage]:
         """Return passages from a cloud vector store when configured."""
+        selected_limit = limit or self.settings.retrieval_limit
         logger.info(
             "Starting RAG retrieval backend=bigquery-vector query_chars=%s limit=%s "
             "dataset=%s table=%s",
             len(query),
-            limit or self.settings.retrieval_limit,
+            selected_limit,
             self.settings.bigquery_dataset_id,
             self.settings.bigquery_table_id,
         )
@@ -167,7 +175,106 @@ class BigQueryVectorKnowledgeBaseRetriever:
             raise RagDataNotReadyError(
                 "BIGQUERY_PROJECT_ID is required when RAG_BACKEND=bigquery-vector."
             )
-        raise RagDataNotReadyError("BigQuery vector retrieval is not implemented yet.")
+
+        query_embedding = self._get_embedding_model().encode(
+            query,
+            normalize_embeddings=True,
+        ).tolist()
+        rows = self._run_vector_search(query_embedding=query_embedding, limit=selected_limit)
+        passages = [_map_bigquery_row(row) for row in rows]
+        logger.info(
+            "RAG retrieval completed backend=bigquery-vector passages=%s table=%s.%s.%s",
+            len(passages),
+            self.settings.bigquery_project_id,
+            self.settings.bigquery_dataset_id,
+            self.settings.bigquery_table_id,
+        )
+        return passages
+
+    def _get_embedding_model(self) -> Any:
+        if self._embedding_model is None:
+            try:
+                from sentence_transformers import SentenceTransformer
+            except ImportError as exc:
+                raise RagAnalysisError("sentence-transformers is not installed.") from exc
+
+            logger.info("Loading embedding model=%s", self.settings.embedding_model_name)
+            self._embedding_model = SentenceTransformer(self.settings.embedding_model_name)
+        return self._embedding_model
+
+    def _get_bigquery_client(self) -> Any:
+        if self._bigquery_client is None:
+            try:
+                from google.cloud import bigquery
+            except ImportError as exc:
+                raise RagAnalysisError(
+                    "google-cloud-bigquery is required for RAG_BACKEND=bigquery-vector."
+                ) from exc
+            self._bigquery_client = bigquery.Client(project=self.settings.bigquery_project_id)
+        return self._bigquery_client
+
+    def _build_job_config(self, query_embedding: list[float], limit: int) -> Any:
+        try:
+            from google.cloud import bigquery
+        except ImportError:
+            return {"query_embedding": query_embedding, "limit": limit}
+        return bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ArrayQueryParameter("query_embedding", "FLOAT64", query_embedding),
+                bigquery.ScalarQueryParameter("limit", "INT64", limit),
+            ]
+        )
+
+    def _run_vector_search(self, query_embedding: list[float], limit: int) -> list[Any]:
+        table_ref = (
+            f"`{self.settings.bigquery_project_id}."
+            f"{self.settings.bigquery_dataset_id}.{self.settings.bigquery_table_id}`"
+        )
+        sql = f"""
+        SELECT
+          base.id AS id,
+          base.content AS content,
+          base.source_path AS source_path,
+          base.heading AS heading,
+          distance
+        FROM VECTOR_SEARCH(
+          TABLE {table_ref},
+          'embedding',
+          (SELECT @query_embedding AS embedding),
+          top_k => @limit
+        )
+        ORDER BY distance ASC
+        """
+        try:
+            job = self._get_bigquery_client().query(
+                sql,
+                job_config=self._build_job_config(query_embedding, limit),
+            )
+            return list(job.result())
+        except Exception as exc:
+            logger.exception("BigQuery vector retrieval failed.")
+            raise RagAnalysisError("Could not retrieve BigQuery RAG context.") from exc
+
+
+def _map_bigquery_row(row: Any) -> RetrievedPassage:
+    return RetrievedPassage(
+        content=str(_read_row_field(row, "content", "")),
+        source_path=str(_read_row_field(row, "source_path", "bigquery")),
+        distance=_read_optional_float(row, "distance"),
+        heading=str(_read_row_field(row, "heading", "")) or None,
+        section_slug=str(_read_row_field(row, "id", "")) or None,
+    )
+
+
+def _read_row_field(row: Any, key: str, default: Any = None) -> Any:
+    if isinstance(row, dict):
+        return row.get(key, default)
+    return getattr(row, key, default)
+
+
+def _read_optional_float(row: Any, key: str) -> float | None:
+    value = _read_row_field(row, key)
+    return float(value) if value is not None else None
 
 
 def _source_labels(passages: list[RetrievedPassage]) -> list[str]:

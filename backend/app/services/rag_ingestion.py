@@ -49,7 +49,10 @@ class RagIngestionService:
             self._store_chunks(chunks)
             collection_name = self.settings.chroma_collection_name
         elif self.settings.rag_backend == "bigquery-vector":
-            raise RagDataNotReadyError("BigQuery vector ingestion is not implemented yet.")
+            self._store_bigquery_chunks(chunks)
+            collection_name = (
+                f"{self.settings.bigquery_dataset_id}.{self.settings.bigquery_table_id}"
+            )
         else:
             raise RagDataNotReadyError(f"Unsupported RAG backend: {self.settings.rag_backend}")
 
@@ -98,6 +101,56 @@ class RagIngestionService:
                 for chunk in chunks
             ],
         )
+
+    def _store_bigquery_chunks(self, chunks: list[TextChunk]) -> None:
+        if not self.settings.bigquery_project_id:
+            raise RagDataNotReadyError(
+                "BIGQUERY_PROJECT_ID is required when RAG_BACKEND=bigquery-vector."
+            )
+        try:
+            from google.cloud import bigquery
+            from sentence_transformers import SentenceTransformer
+        except ImportError as exc:
+            raise RagAnalysisError(
+                "google-cloud-bigquery and sentence-transformers are required for BigQuery RAG ingestion."
+            ) from exc
+
+        table_id = (
+            f"{self.settings.bigquery_project_id}."
+            f"{self.settings.bigquery_dataset_id}.{self.settings.bigquery_table_id}"
+        )
+        client = bigquery.Client(project=self.settings.bigquery_project_id)
+        dataset_id = f"{self.settings.bigquery_project_id}.{self.settings.bigquery_dataset_id}"
+        client.create_dataset(bigquery.Dataset(dataset_id), exists_ok=True)
+        schema = [
+            bigquery.SchemaField("id", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("content", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("source_path", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("heading", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("embedding", "FLOAT64", mode="REPEATED"),
+        ]
+        table = bigquery.Table(table_id, schema=schema)
+        client.create_table(table, exists_ok=True)
+
+        logger.info("Loading embedding model=%s for BigQuery RAG ingestion", self.settings.embedding_model_name)
+        model = SentenceTransformer(self.settings.embedding_model_name)
+        embeddings = model.encode(
+            [chunk.content for chunk in chunks],
+            normalize_embeddings=True,
+        ).tolist()
+        rows = [
+            {
+                "id": chunk.id,
+                "content": chunk.content,
+                "source_path": chunk.source_path,
+                "heading": chunk.heading or "",
+                "embedding": embedding,
+            }
+            for chunk, embedding in zip(chunks, embeddings)
+        ]
+        errors = client.insert_rows_json(table_id, rows)
+        if errors:
+            raise RagAnalysisError(f"BigQuery RAG ingestion failed: {errors}")
 
 
 def _reset_collection(client: Any, collection_name: str) -> None:

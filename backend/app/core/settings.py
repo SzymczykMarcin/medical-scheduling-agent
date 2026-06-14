@@ -13,6 +13,7 @@ class Settings(BaseSettings):
         env_file=str(PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
     demo_mode: bool = False
@@ -55,7 +56,7 @@ class Settings(BaseSettings):
     rag_chunk_characters: int = 1200
     rag_chunk_overlap: int = 180
 
-    calendar_storage_backend: Literal["memory", "sqlite"] = "sqlite"
+    calendar_storage_backend: Literal["memory", "sqlite", "sql"] = "sqlite"
     seed_demo_calendar: bool = True
     cloud_storage_mode: Literal["ephemeral", "persistent"] = "ephemeral"
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
@@ -72,8 +73,10 @@ class Settings(BaseSettings):
             raise ValueError("OLLAMA_BASE_URL is required when LLM_PROVIDER=ollama-http.")
         if self.rag_backend == "bigquery-vector" and not self.bigquery_project_id:
             raise ValueError("BIGQUERY_PROJECT_ID is required when RAG_BACKEND=bigquery-vector.")
-        if self.calendar_storage_backend == "sqlite" and not self.effective_database_url:
-            raise ValueError("DATABASE_URL or SQLITE_DATABASE_URL is required for SQLite calendar storage.")
+        if self.calendar_storage_backend in {"sqlite", "sql"} and not self.effective_database_url:
+            raise ValueError("DATABASE_URL or SQLITE_DATABASE_URL is required for SQL calendar storage.")
+        if self.calendar_storage_backend == "sql" and not self.database_url:
+            raise ValueError("DATABASE_URL is required when CALENDAR_STORAGE_BACKEND=sql.")
         if self.cloud_storage_mode == "persistent" and not self.database_url:
             raise ValueError("DATABASE_URL is required when CLOUD_STORAGE_MODE=persistent.")
         return self

@@ -66,6 +66,32 @@ def test_chroma_backend_ingestion_stores_vector_chunks(tmp_path: Path, monkeypat
     assert stored_chunk_counts == [1]
 
 
+def test_bigquery_backend_ingestion_stores_vector_chunks(tmp_path: Path, monkeypatch) -> None:
+    rag_dir = tmp_path / "rag"
+    rag_dir.mkdir()
+    (rag_dir / "rules.md").write_text("# Rules\nKonsultacja trwa 30 minut.", encoding="utf-8")
+    stored_chunk_counts: list[int] = []
+
+    def fake_store_bigquery_chunks(self, chunks):
+        stored_chunk_counts.append(len(chunks))
+
+    monkeypatch.setattr(RagIngestionService, "_store_bigquery_chunks", fake_store_bigquery_chunks)
+    service = RagIngestionService(
+        Settings(
+            rag_backend="bigquery-vector",
+            bigquery_project_id="demo-project",
+            rag_document_dir=str(rag_dir),
+        )
+    )
+
+    response = service.rebuild_index()
+
+    assert response.collection_name == "rag_dataset.medical_scheduling_rules"
+    assert response.document_count == 1
+    assert response.chunk_count == 1
+    assert stored_chunk_counts == [1]
+
+
 def test_rag_ingestion_endpoint_maps_missing_data_to_bad_request(monkeypatch) -> None:
     class RejectingIngestionService:
         def rebuild_index(self):

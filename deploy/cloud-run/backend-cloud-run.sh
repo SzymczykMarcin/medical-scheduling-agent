@@ -17,6 +17,12 @@ set -euo pipefail
 : "${ASR_DEVICE:=cpu}"
 : "${ASR_COMPUTE_TYPE:=int8}"
 : "${OLLAMA_MODEL:=SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0}"
+: "${CALENDAR_STORAGE_BACKEND:=sqlite}"
+: "${CLOUD_STORAGE_MODE:=ephemeral}"
+: "${DATABASE_URL:=}"
+: "${RAG_BACKEND:=chroma}"
+: "${RAG_INDEX_MODE:=local-chroma}"
+: "${BIGQUERY_PROJECT_ID:=}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -42,5 +48,5 @@ gcloud run deploy "${BACKEND_SERVICE}" \
   --memory "${BACKEND_MEMORY}" \
   --timeout 600 \
   --max-instances "${BACKEND_MAX_INSTANCES}" \
-  --set-env-vars "RUNTIME_PROFILE=cloud-run,BACKEND_HOST=0.0.0.0,BACKEND_PORT=8080,CORS_ORIGINS=${FRONTEND_ORIGIN},DEMO_MODE=false,ASR_PROVIDER=faster-whisper,ASR_MODEL_NAME=${ASR_MODEL_NAME},ASR_DEVICE=${ASR_DEVICE},ASR_COMPUTE_TYPE=${ASR_COMPUTE_TYPE},LLM_PROVIDER=ollama-http,OLLAMA_BASE_URL=${OLLAMA_BASE_URL},OLLAMA_MODEL=${OLLAMA_MODEL},RAG_BACKEND=chroma,RAG_INDEX_MODE=local-chroma,CHROMA_PERSIST_DIR=/tmp/medical-scheduling-agent/chroma,RAG_DOCUMENT_DIR=/app/data/rag,CALENDAR_STORAGE_BACKEND=sqlite,SEED_DEMO_CALENDAR=true,CLOUD_STORAGE_MODE=ephemeral,SQLITE_DATABASE_URL=sqlite:////tmp/medical-scheduling-agent/demo.sqlite3" \
+  --set-env-vars "RUNTIME_PROFILE=cloud-run,BACKEND_HOST=0.0.0.0,BACKEND_PORT=8080,CORS_ORIGINS=${FRONTEND_ORIGIN},DEMO_MODE=false,ASR_PROVIDER=faster-whisper,ASR_MODEL_NAME=${ASR_MODEL_NAME},ASR_DEVICE=${ASR_DEVICE},ASR_COMPUTE_TYPE=${ASR_COMPUTE_TYPE},LLM_PROVIDER=ollama-http,OLLAMA_BASE_URL=${OLLAMA_BASE_URL},OLLAMA_MODEL=${OLLAMA_MODEL},RAG_BACKEND=${RAG_BACKEND},RAG_INDEX_MODE=${RAG_INDEX_MODE},BIGQUERY_PROJECT_ID=${BIGQUERY_PROJECT_ID},CHROMA_PERSIST_DIR=/tmp/medical-scheduling-agent/chroma,RAG_DOCUMENT_DIR=/app/data/rag,CALENDAR_STORAGE_BACKEND=${CALENDAR_STORAGE_BACKEND},SEED_DEMO_CALENDAR=true,CLOUD_STORAGE_MODE=${CLOUD_STORAGE_MODE},DATABASE_URL=${DATABASE_URL},SQLITE_DATABASE_URL=sqlite:////tmp/medical-scheduling-agent/demo.sqlite3" \
   --labels "app=medical-scheduling-agent,component=backend"

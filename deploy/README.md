@@ -136,9 +136,25 @@ SQLITE_DATABASE_URL=sqlite:////tmp/medical-scheduling-agent/demo.sqlite3
 
 Use `CLOUD_STORAGE_MODE=persistent` only when `DATABASE_URL` points to durable
 database storage. The application validates this so a cloud deployment does not
-quietly pretend that `/tmp` is persistent. The current repository implementation
-persists to SQLite; managed cloud database support should be added behind the
-same calendar repository boundary.
+quietly pretend that `/tmp` is persistent.
+
+For durable appointments:
+
+```env
+CLOUD_STORAGE_MODE=persistent
+CALENDAR_STORAGE_BACKEND=sql
+DATABASE_URL=postgresql+psycopg://...
+```
+
+For durable managed vector RAG:
+
+```env
+RAG_BACKEND=bigquery-vector
+RAG_INDEX_MODE=managed-vector
+BIGQUERY_PROJECT_ID=your-project-id
+BIGQUERY_DATASET_ID=rag_dataset
+BIGQUERY_TABLE_ID=medical_scheduling_rules
+```
 
 See:
 

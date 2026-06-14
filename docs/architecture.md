@@ -46,14 +46,15 @@ appointments survive backend restarts when SQLite points to durable local storag
 
 Cloud demo profiles are explicit about storage durability through
 `CLOUD_STORAGE_MODE`. The default Cloud Run profile uses `/tmp` and is therefore
-ephemeral. Persistent cloud storage must provide `DATABASE_URL`.
+ephemeral. Persistent cloud appointment storage must use `CALENDAR_STORAGE_BACKEND=sql`
+and provide `DATABASE_URL`.
 
 ## RAG Backend Strategy
 
 RAG backend selection is explicit through `RAG_BACKEND`:
 
 - `chroma`: local semantic vector search with ChromaDB and sentence-transformers.
-- `bigquery-vector`: cloud vector-search extension point. It is configured but not implemented yet.
+- `bigquery-vector`: managed cloud vector search through BigQuery Vector Search.
 
 Markdown/TXT/CSV/JSONL files under `data/rag` are source documents, not the retrieval backend. Structured medical rules are validated first and then indexed into a vector store before `RAG_BACKEND=chroma` can retrieve them semantically.
 

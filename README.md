@@ -370,15 +370,28 @@ For durable cloud storage, set:
 
 ```env
 CLOUD_STORAGE_MODE=persistent
-DATABASE_URL=...
+CALENDAR_STORAGE_BACKEND=sql
+DATABASE_URL=postgresql+psycopg://...
 ```
 
 `DATABASE_URL` should point to durable database storage, for example a Cloud SQL
-connection exposed to the container after a matching SQL driver/repository is
-added. The current committed implementation provides the storage boundary and
-SQLite persistence; managed cloud database support is the next extension point.
-Durable vector RAG should use a persistent vector backend or a deploy-time rebuild
-process from durable rule sources.
+Postgres connection exposed to the container.
+
+For durable managed vector RAG, use the BigQuery Vector backend:
+
+```env
+RAG_BACKEND=bigquery-vector
+RAG_INDEX_MODE=managed-vector
+BIGQUERY_PROJECT_ID=your-project-id
+BIGQUERY_DATASET_ID=rag_dataset
+BIGQUERY_TABLE_ID=medical_scheduling_rules
+```
+
+Install backend cloud extras in environments that use managed storage:
+
+```bash
+pip install -e "backend[cloud]"
+```
 
 ## Safety And Scope
 

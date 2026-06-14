@@ -54,3 +54,18 @@ def test_ollama_http_requires_base_url() -> None:
 def test_persistent_cloud_storage_requires_database_url() -> None:
     with pytest.raises(ValidationError, match="DATABASE_URL"):
         Settings(runtime_profile="cloud-run", cloud_storage_mode="persistent", database_url=None)
+
+
+def test_sql_calendar_storage_requires_database_url() -> None:
+    with pytest.raises(ValidationError, match="DATABASE_URL"):
+        Settings(calendar_storage_backend="sql", database_url=None)
+
+
+def test_sql_calendar_storage_accepts_managed_database_url() -> None:
+    settings = Settings(
+        calendar_storage_backend="sql",
+        cloud_storage_mode="persistent",
+        database_url="postgresql+psycopg://demo:demo@example.internal/demo",
+    )
+
+    assert settings.effective_database_url == "postgresql+psycopg://demo:demo@example.internal/demo"

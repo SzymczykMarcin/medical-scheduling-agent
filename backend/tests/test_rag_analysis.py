@@ -225,10 +225,51 @@ def test_chroma_backend_does_not_fall_back_when_store_is_missing(tmp_path) -> No
         retriever.retrieve("consultation", limit=1)
 
 
-def test_bigquery_vector_backend_reports_not_implemented_with_project_id() -> None:
+def test_bigquery_vector_backend_queries_managed_vector_store() -> None:
+    class FakeVector(list):
+        def tolist(self):
+            return list(self)
+
+    class FakeEmbedding:
+        def encode(self, query: str, normalize_embeddings: bool):
+            assert query == "konsultacja bólu głowy"
+            assert normalize_embeddings is True
+            return FakeVector([0.1, 0.2, 0.3])
+
+    class FakeQueryJob:
+        def result(self):
+            return [
+                {
+                    "id": "rule-1",
+                    "content": "Konsultacja bólu głowy zwykle trwa 30 minut.",
+                    "source_path": "bigquery://rules",
+                    "heading": "Konsultacje POZ",
+                    "distance": 0.15,
+                }
+            ]
+
+    class FakeBigQueryClient:
+        def __init__(self) -> None:
+            self.sql: str | None = None
+            self.job_config = None
+
+        def query(self, sql: str, job_config):
+            self.sql = sql
+            self.job_config = job_config
+            return FakeQueryJob()
+
+    client = FakeBigQueryClient()
     retriever = BigQueryVectorKnowledgeBaseRetriever(
-        Settings(rag_backend="bigquery-vector", bigquery_project_id="demo-project")
+        Settings(rag_backend="bigquery-vector", bigquery_project_id="demo-project"),
+        bigquery_client=client,
+        embedding_model=FakeEmbedding(),
     )
 
-    with pytest.raises(RagDataNotReadyError, match="not implemented"):
-        retriever.retrieve("consultation")
+    passages = retriever.retrieve("konsultacja bólu głowy", limit=1)
+
+    assert client.sql is not None
+    assert "VECTOR_SEARCH" in client.sql
+    assert "demo-project.rag_dataset.medical_scheduling_rules" in client.sql
+    assert passages[0].content == "Konsultacja bólu głowy zwykle trwa 30 minut."
+    assert passages[0].heading == "Konsultacje POZ"
+    assert passages[0].distance == 0.15

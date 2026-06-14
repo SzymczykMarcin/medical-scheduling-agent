@@ -18,7 +18,7 @@ COPY data/samples/.gitkeep /app/data/samples/.gitkeep
 WORKDIR /app/backend
 
 RUN python -m pip install --upgrade pip \
-    && python -m pip install .
+    && python -m pip install ".[cloud]"
 
 ENV BACKEND_HOST=0.0.0.0
 ENV BACKEND_PORT=8080

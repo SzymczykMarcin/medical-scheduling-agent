@@ -91,7 +91,8 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert "--allow-unauthenticated" in content
     assert "RUNTIME_PROFILE=cloud-run" in content
     assert "ASR_DEVICE=${ASR_DEVICE}" in content
-    assert "RAG_BACKEND=chroma" in content
+    assert "RAG_BACKEND=${RAG_BACKEND}" in content
+    assert "CALENDAR_STORAGE_BACKEND=${CALENDAR_STORAGE_BACKEND}" in content
     assert "C:/" not in content
     assert "C:\\" not in content
 
@@ -102,7 +103,7 @@ def test_backend_dockerfile_contains_cloud_run_entrypoint() -> None:
     assert "FROM python:3.12-slim" in content
     assert "COPY backend/app" in content
     assert "COPY data/rag" in content
-    assert "python -m pip install ." in content
+    assert 'python -m pip install ".[cloud]"' in content
     assert "uvicorn app.main:app" in content
 
 

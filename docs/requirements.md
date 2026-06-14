@@ -109,7 +109,7 @@ the model directly.
 | Backend | Purpose | Status |
 | --- | --- | --- |
 | `chroma` | Local semantic vector search | Default |
-| `bigquery-vector` | Cloud vector-search extension point | Configured, not implemented |
+| `bigquery-vector` | Managed BigQuery Vector Search | Supported cloud backend |
 
 Backend selection must be explicit. The system must not silently switch from a broken vector store to non-vector retrieval, because that would hide configuration failures during testing. Markdown/TXT files are source documents for ingestion, not a replacement for vector retrieval.
 
@@ -118,6 +118,7 @@ Backend selection must be explicit. The system must not silently switch from a b
 | Backend | Purpose | Status |
 | --- | --- | --- |
 | `sqlite` | Local and demo cloud calendar persistence | Default |
+| `sql` | Managed SQL databases through SQLAlchemy URLs | Supported cloud backend |
 | `memory` | Focused tests and temporary debug usage | Supported |
 
 Cloud profiles must also declare `CLOUD_STORAGE_MODE`. The default value
