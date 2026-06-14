@@ -364,6 +364,7 @@ Deployment helper scripts live in:
 
 - `deploy/cloud-run/deploy-demo.sh`
 - `deploy/cloud-run/backend-cloud-run.sh`
+- `deploy/cloud-run/frontend-cloud-run.sh`
 - `deploy/cloud-run/bielik-cloud-run.sh`
 - `deploy/cloud-run/embedding-cloud-run.sh`
 
@@ -376,13 +377,36 @@ Recommended Cloud Run demo flow:
 ```bash
 export PROJECT_ID="your-project-id"
 export REGION="europe-west1"
-export FRONTEND_ORIGIN="https://your-frontend.example.com"
 ./deploy/cloud-run/deploy-demo.sh
 ```
 
 The script enables required Google APIs, creates a backend service account,
 deploys private Bielik Cloud Run, grants the backend `roles/run.invoker`, deploys
-the public backend, and prints the `VITE_API_BASE_URL` value for the frontend.
+the public backend, deploys the React frontend as a public Cloud Run service,
+updates backend CORS to the frontend URL, rebuilds the RAG index, prewarms ASR
+and Bielik, and runs a basic connectivity smoke test.
+
+The first deployment can take a while because Cloud Build pulls the Bielik model
+into the model service image and the backend prewarm step downloads the
+`faster-whisper` ASR model. These downloads are expected and should be visible in
+Cloud Build and Cloud Run logs. If any model cannot be downloaded, the script
+fails instead of silently switching to a fake fallback.
+
+After the script finishes, it prints:
+
+- backend URL,
+- Bielik service URL,
+- frontend URL.
+
+Open the frontend URL in a browser and test the demo from there.
+
+If you want to run the preparation steps manually after a deployment:
+
+```bash
+curl -fsS -X POST "https://your-backend-url/api/rag/ingest"
+curl -fsS -X POST "https://your-backend-url/api/debug/prewarm"
+python tools/run_demo_smoke.py --backend-url "https://your-backend-url"
+```
 
 The default cloud backend profile uses CPU ASR (`ASR_DEVICE=cpu`,
 `ASR_COMPUTE_TYPE=int8`) to keep the public demo easier to deploy. The Chroma

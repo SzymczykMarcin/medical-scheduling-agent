@@ -68,6 +68,10 @@ class TranscriptionService:
         logger.info("Transcription completed for %s: %s", filename, transcript)
         return transcript
 
+    def prewarm_model(self) -> None:
+        """Load the ASR model so the first real recording does not download it."""
+        self._get_model()
+
     def _transcribe_file(self, audio_path: str) -> str:
         model = self._get_model()
         logger.info(

@@ -144,3 +144,51 @@ def test_debug_endpoint_uses_configured_service(monkeypatch) -> None:
     assert body["direct_bielik_output"] == "Direct summary"
     assert body["retrieved_context"][0]["heading"] == "Neurologia"
     assert body["scheduler_result"]["status"] == "scheduled"
+
+
+def test_prewarm_endpoint_reports_loaded_components(monkeypatch) -> None:
+    calls: list[str] = []
+
+    class FakeTranscriptionService:
+        def prewarm_model(self) -> None:
+            calls.append("asr")
+
+    class FakeLlmService:
+        def generate(self, messages) -> str:
+            calls.append("bielik")
+            return "gotowe"
+
+    monkeypatch.setattr(debug, "transcription_service", FakeTranscriptionService())
+    monkeypatch.setattr(debug, "llm_service", FakeLlmService())
+    client = TestClient(app)
+
+    response = client.post("/api/debug/prewarm")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert [component["name"] for component in body["components"]] == ["asr", "bielik"]
+    assert calls == ["asr", "bielik"]
+
+
+def test_prewarm_endpoint_fails_visibly(monkeypatch) -> None:
+    class FailingTranscriptionService:
+        def prewarm_model(self) -> None:
+            raise RuntimeError("ASR download failed")
+
+    class FakeLlmService:
+        def generate(self, messages) -> str:
+            return "gotowe"
+
+    monkeypatch.setattr(debug, "transcription_service", FailingTranscriptionService())
+    monkeypatch.setattr(debug, "llm_service", FakeLlmService())
+    client = TestClient(app)
+
+    response = client.post("/api/debug/prewarm")
+
+    assert response.status_code == 503
+    body = response.json()["detail"]
+    assert body["status"] == "failed"
+    assert body["components"][0]["name"] == "asr"
+    assert body["components"][0]["status"] == "failed"
+    assert "ASR download failed" in body["components"][0]["error_message"]

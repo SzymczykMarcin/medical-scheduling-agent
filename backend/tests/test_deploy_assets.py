@@ -10,12 +10,17 @@ def test_model_server_deployment_assets_exist() -> None:
         REPO_ROOT / ".dockerignore",
         REPO_ROOT / ".github" / "workflows" / "ci.yml",
         REPO_ROOT / "Dockerfile",
+        REPO_ROOT / "frontend" / ".dockerignore",
+        REPO_ROOT / "frontend" / "Dockerfile",
+        REPO_ROOT / "frontend" / "cloudbuild.yaml",
+        REPO_ROOT / "frontend" / "nginx.conf",
         DEPLOY_DIR / "README.md",
         DEPLOY_DIR / "docker-compose.local.yml",
         DEPLOY_DIR / "ollama-bielik" / "Dockerfile",
         DEPLOY_DIR / "ollama-embedding" / "Dockerfile",
         DEPLOY_DIR / "cloud-run" / "deploy-demo.sh",
         DEPLOY_DIR / "cloud-run" / "backend-cloud-run.sh",
+        DEPLOY_DIR / "cloud-run" / "frontend-cloud-run.sh",
         DEPLOY_DIR / "cloud-run" / "bielik-cloud-run.sh",
         DEPLOY_DIR / "cloud-run" / "embedding-cloud-run.sh",
     ]
@@ -110,12 +115,33 @@ def test_backend_dockerfile_contains_cloud_run_entrypoint() -> None:
     assert "uvicorn app.main:app" in content
 
 
+def test_frontend_cloud_run_assets_build_static_react_app() -> None:
+    dockerfile = (REPO_ROOT / "frontend" / "Dockerfile").read_text(encoding="utf-8")
+    cloudbuild = (REPO_ROOT / "frontend" / "cloudbuild.yaml").read_text(encoding="utf-8")
+    nginx_config = (REPO_ROOT / "frontend" / "nginx.conf").read_text(encoding="utf-8")
+    script = (DEPLOY_DIR / "cloud-run" / "frontend-cloud-run.sh").read_text(encoding="utf-8")
+
+    assert "FROM node:20-alpine AS build" in dockerfile
+    assert "ARG VITE_API_BASE_URL" in dockerfile
+    assert "npm ci" in dockerfile
+    assert "npm run build" in dockerfile
+    assert "nginxinc/nginx-unprivileged" in dockerfile
+    assert "listen 8080" in nginx_config
+    assert "try_files $uri $uri/ /index.html" in nginx_config
+    assert "_VITE_API_BASE_URL" in cloudbuild
+    assert ": \"${BACKEND_URL:?" in script
+    assert "gcloud builds submit" in script
+    assert "cloudbuild.yaml" in script
+    assert "--allow-unauthenticated" in script
+    assert "C:/" not in script
+    assert "C:\\" not in script
+
+
 def test_demo_cloud_run_script_wires_private_model_to_public_backend() -> None:
     content = (DEPLOY_DIR / "cloud-run" / "deploy-demo.sh").read_text(encoding="utf-8")
 
     assert ": \"${PROJECT_ID:?" in content
     assert ": \"${REGION:?" in content
-    assert ": \"${FRONTEND_ORIGIN:?" in content
     assert "gcloud services enable" in content
     assert "gcloud iam service-accounts create" in content
     assert "bielik-cloud-run.sh" in content
@@ -123,7 +149,11 @@ def test_demo_cloud_run_script_wires_private_model_to_public_backend() -> None:
     assert "roles/run.invoker" in content
     assert 'OLLAMA_AUTH_MODE="google-id-token"' in content
     assert "backend-cloud-run.sh" in content
-    assert "VITE_API_BASE_URL=" in content
+    assert "frontend-cloud-run.sh" in content
+    assert "gcloud run services update" in content
+    assert "CORS_ORIGINS=${FRONTEND_URL}" in content
+    assert "/api/rag/ingest" in content
+    assert "/api/debug/prewarm" in content
     assert "--basic-only" in content
 
 

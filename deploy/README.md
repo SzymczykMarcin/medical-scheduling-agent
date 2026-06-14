@@ -81,7 +81,6 @@ The recommended self-hosted demo path is:
 ```bash
 export PROJECT_ID="your-project-id"
 export REGION="europe-west1"
-export FRONTEND_ORIGIN="https://your-frontend.example.com"
 ./deploy/cloud-run/deploy-demo.sh
 ```
 
@@ -92,7 +91,16 @@ export FRONTEND_ORIGIN="https://your-frontend.example.com"
 - deploys private Bielik Cloud Run,
 - grants the backend service account `roles/run.invoker` on Bielik,
 - deploys public backend Cloud Run with `OLLAMA_AUTH_MODE=google-id-token`,
-- prints the backend URL and `VITE_API_BASE_URL` value.
+- deploys the React frontend as a public Cloud Run service,
+- rebuilds backend CORS with the real frontend URL,
+- runs RAG ingestion,
+- prewarms ASR and Bielik,
+- prints backend, Bielik, and frontend URLs.
+
+The first run is intentionally slower: Cloud Build pulls the Bielik model into
+the model service image, RAG ingestion downloads the embedding model, and
+`/api/debug/prewarm` downloads/loads the ASR model. If any of these downloads
+fails, the command should fail visibly.
 
 Manual deployment is still possible. Deploy the Bielik model service first:
 
@@ -124,16 +132,19 @@ GPU-backed backend ASR, override those variables and adjust Cloud Run resources.
 
 ### Cloud Smoke Checklist
 
-After deployment:
+After deployment, `deploy-demo.sh` already runs the basic smoke check. For a
+manual full check:
 
 ```bash
 curl "https://your-backend-url/health"
 curl -X POST "https://your-backend-url/api/rag/ingest"
+curl -X POST "https://your-backend-url/api/debug/prewarm"
 curl "https://your-backend-url/api/calendar/events"
+python tools/run_demo_smoke.py --backend-url "https://your-backend-url"
 ```
 
-Then configure the frontend API base URL to point at the backend URL and test a
-manual recording.
+Then open the frontend URL printed by the deployment script and test a manual
+recording.
 
 For frontend builds:
 
@@ -196,5 +207,6 @@ See:
 
 - `deploy/cloud-run/deploy-demo.sh`
 - `deploy/cloud-run/backend-cloud-run.sh`
+- `deploy/cloud-run/frontend-cloud-run.sh`
 - `deploy/cloud-run/bielik-cloud-run.sh`
 - `deploy/cloud-run/embedding-cloud-run.sh`

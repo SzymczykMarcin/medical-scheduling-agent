@@ -3,11 +3,14 @@ set -euo pipefail
 
 : "${PROJECT_ID:?Set PROJECT_ID to your Google Cloud project ID.}"
 : "${REGION:?Set REGION, for example europe-west1.}"
-: "${FRONTEND_ORIGIN:?Set FRONTEND_ORIGIN to the public frontend URL or local preview origin.}"
 
 : "${BIELIK_SERVICE:=medical-scheduling-bielik}"
 : "${BACKEND_SERVICE:=medical-scheduling-backend}"
+: "${FRONTEND_SERVICE:=medical-scheduling-frontend}"
 : "${BACKEND_SERVICE_ACCOUNT:=medical-scheduling-backend}"
+: "${FRONTEND_ORIGIN:=http://localhost:5173}"
+: "${RUN_RAG_INGEST:=1}"
+: "${RUN_MODEL_PREWARM:=1}"
 : "${RUN_SMOKE_TEST:=1}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -42,16 +45,36 @@ OLLAMA_BASE_URL="${BIELIK_URL}" \
 OLLAMA_AUTH_MODE="google-id-token" \
 BACKEND_SERVICE="${BACKEND_SERVICE}" \
 BACKEND_SERVICE_ACCOUNT_EMAIL="${BACKEND_SERVICE_ACCOUNT_EMAIL}" \
+FRONTEND_ORIGIN="${FRONTEND_ORIGIN}" \
 "${SCRIPT_DIR}/backend-cloud-run.sh"
 
 BACKEND_URL="$(gcloud run services describe "${BACKEND_SERVICE}" \
   --region "${REGION}" \
   --format "value(status.url)")"
 
+BACKEND_URL="${BACKEND_URL}" \
+FRONTEND_SERVICE="${FRONTEND_SERVICE}" \
+"${SCRIPT_DIR}/frontend-cloud-run.sh"
+
+FRONTEND_URL="$(gcloud run services describe "${FRONTEND_SERVICE}" \
+  --region "${REGION}" \
+  --format "value(status.url)")"
+
+gcloud run services update "${BACKEND_SERVICE}" \
+  --region "${REGION}" \
+  --update-env-vars "CORS_ORIGINS=${FRONTEND_URL}"
+
 echo "Backend URL: ${BACKEND_URL}"
 echo "Bielik URL: ${BIELIK_URL}"
-echo "Frontend env:"
-echo "VITE_API_BASE_URL=${BACKEND_URL}"
+echo "Frontend URL: ${FRONTEND_URL}"
+
+if [ "${RUN_RAG_INGEST}" = "1" ]; then
+  curl -fsS -X POST "${BACKEND_URL}/api/rag/ingest"
+fi
+
+if [ "${RUN_MODEL_PREWARM}" = "1" ]; then
+  curl -fsS -X POST "${BACKEND_URL}/api/debug/prewarm"
+fi
 
 if [ "${RUN_SMOKE_TEST}" = "1" ]; then
   python "${REPO_ROOT}/tools/run_demo_smoke.py" \
