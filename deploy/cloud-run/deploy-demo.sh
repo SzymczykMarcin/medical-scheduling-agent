@@ -17,6 +17,22 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 BACKEND_SERVICE_ACCOUNT_EMAIL="${BACKEND_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com"
 
+if [ "${PROJECT_ID}" = "your-google-cloud-project-id" ] || [ "${PROJECT_ID}" = "your-project-id" ]; then
+  echo "PROJECT_ID is still a placeholder: ${PROJECT_ID}" >&2
+  echo "Run: gcloud projects list --format='table(projectId,name,projectNumber)'" >&2
+  echo "Then set PROJECT_ID to a real projectId value, not the example text." >&2
+  exit 2
+fi
+
+if ! gcloud projects describe "${PROJECT_ID}" >/dev/null 2>&1; then
+  echo "Cannot access Google Cloud project: ${PROJECT_ID}" >&2
+  echo "Check that the project exists and your active gcloud account has access." >&2
+  echo "Useful commands:" >&2
+  echo "  gcloud auth list" >&2
+  echo "  gcloud projects list --format='table(projectId,name,projectNumber)'" >&2
+  exit 2
+fi
+
 gcloud config set project "${PROJECT_ID}"
 
 gcloud services enable \

@@ -142,6 +142,9 @@ def test_demo_cloud_run_script_wires_private_model_to_public_backend() -> None:
 
     assert ": \"${PROJECT_ID:?" in content
     assert ": \"${REGION:?" in content
+    assert "PROJECT_ID is still a placeholder" in content
+    assert "gcloud projects describe" in content
+    assert "gcloud projects list --format='table(projectId,name,projectNumber)'" in content
     assert "gcloud services enable" in content
     assert "gcloud iam service-accounts create" in content
     assert "bielik-cloud-run.sh" in content

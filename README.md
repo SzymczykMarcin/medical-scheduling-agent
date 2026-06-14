@@ -172,9 +172,19 @@ cd medical-scheduling-agent
 
 ### 2. Select Project And Region
 
+List projects available to the active Google account:
+
 ```bash
-export PROJECT_ID="your-google-cloud-project-id"
+gcloud auth list
+gcloud projects list --format="table(projectId,name,projectNumber)"
+```
+
+Copy a real value from the `projectId` column. Do not paste the example text.
+
+```bash
+export PROJECT_ID="paste-real-project-id-here"
 export REGION="europe-west1"
+gcloud projects describe "${PROJECT_ID}" --format="value(projectId)"
 gcloud config set project "${PROJECT_ID}"
 ```
 
