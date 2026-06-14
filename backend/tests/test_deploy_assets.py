@@ -7,10 +7,14 @@ DEPLOY_DIR = REPO_ROOT / "deploy"
 
 def test_model_server_deployment_assets_exist() -> None:
     expected_paths = [
+        REPO_ROOT / ".dockerignore",
+        REPO_ROOT / ".github" / "workflows" / "ci.yml",
+        REPO_ROOT / "Dockerfile",
         DEPLOY_DIR / "README.md",
         DEPLOY_DIR / "docker-compose.local.yml",
         DEPLOY_DIR / "ollama-bielik" / "Dockerfile",
         DEPLOY_DIR / "ollama-embedding" / "Dockerfile",
+        DEPLOY_DIR / "cloud-run" / "backend-cloud-run.sh",
         DEPLOY_DIR / "cloud-run" / "bielik-cloud-run.sh",
         DEPLOY_DIR / "cloud-run" / "embedding-cloud-run.sh",
     ]
@@ -71,3 +75,41 @@ def test_cloud_run_scripts_are_parameterized() -> None:
         assert "--labels \"app=medical-scheduling-agent" in content
         assert "C:/" not in content
         assert "C:\\" not in content
+
+
+def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
+    content = (DEPLOY_DIR / "cloud-run" / "backend-cloud-run.sh").read_text(encoding="utf-8")
+
+    assert ": \"${PROJECT_ID:?" in content
+    assert ": \"${REGION:?" in content
+    assert ": \"${FRONTEND_ORIGIN:?" in content
+    assert ": \"${OLLAMA_BASE_URL:?" in content
+    assert "gcloud artifacts repositories describe" in content
+    assert "gcloud artifacts repositories create" in content
+    assert "gcloud builds submit" in content
+    assert "gcloud run deploy" in content
+    assert "--allow-unauthenticated" in content
+    assert "RUNTIME_PROFILE=cloud-run" in content
+    assert "ASR_DEVICE=${ASR_DEVICE}" in content
+    assert "RAG_BACKEND=chroma" in content
+    assert "C:/" not in content
+    assert "C:\\" not in content
+
+
+def test_backend_dockerfile_contains_cloud_run_entrypoint() -> None:
+    content = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+    assert "FROM python:3.12-slim" in content
+    assert "COPY backend/app" in content
+    assert "COPY data/rag" in content
+    assert "python -m pip install ." in content
+    assert "uvicorn app.main:app" in content
+
+
+def test_ci_runs_backend_and_frontend_checks() -> None:
+    content = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+    assert "python -m ruff check ." in content
+    assert 'python -m pytest tests -m "not local_ai"' in content
+    assert "npm ci" in content
+    assert "npm run build" in content

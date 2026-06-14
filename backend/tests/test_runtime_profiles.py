@@ -28,6 +28,8 @@ def test_cloud_run_profile_parses_without_private_paths_or_project_ids() -> None
     assert settings.llm_provider == "ollama-http"
     assert settings.ollama_base_url == "https://your-bielik-service-url"
     assert settings.rag_backend == "chroma"
+    assert settings.asr_device == "cpu"
+    assert settings.asr_compute_type == "int8"
     assert "C:/" not in content
     assert "C:\\" not in content
     assert "/Users/" not in content

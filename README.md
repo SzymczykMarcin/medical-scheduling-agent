@@ -323,6 +323,7 @@ Set at least:
 
 Deployment helper scripts live in:
 
+- `deploy/cloud-run/backend-cloud-run.sh`
 - `deploy/cloud-run/bielik-cloud-run.sh`
 - `deploy/cloud-run/embedding-cloud-run.sh`
 
@@ -330,6 +331,23 @@ They are parameterized through environment variables such as `PROJECT_ID`, `REGI
 and service names. The current cloud assets are a deployment starting point, not a
 complete production architecture. A production version should add authentication,
 persistent storage, observability, request limits, and secrets management.
+
+Minimal Cloud Run order:
+
+```bash
+export PROJECT_ID="your-project-id"
+export REGION="europe-west1"
+./deploy/cloud-run/bielik-cloud-run.sh
+
+export FRONTEND_ORIGIN="https://your-frontend.example.com"
+export OLLAMA_BASE_URL="https://your-bielik-service-url"
+./deploy/cloud-run/backend-cloud-run.sh
+```
+
+The default cloud backend profile uses CPU ASR (`ASR_DEVICE=cpu`,
+`ASR_COMPUTE_TYPE=int8`) to keep the public demo easier to deploy. The Chroma
+index and SQLite database use `/tmp` paths in the template, so they are temporary
+and must be replaced for a durable deployment.
 
 ## Safety And Scope
 
