@@ -1,122 +1,50 @@
 # Medical Scheduling Agent
 
-Demo web application for voice-based appointment scheduling in Polish.
+Demo system for Polish voice-based medical appointment scheduling.
 
-The system accepts a patient voice recording, transcribes it locally, uses Bielik with
-vector RAG knowledge to estimate appointment intent and duration, validates the result
-with deterministic scheduling code, writes the appointment into a simulated calendar,
-and returns a short SMS-style confirmation.
+The patient records a voice message in the browser. The backend transcribes the
+audio, retrieves appointment-duration rules from vector RAG, asks Bielik to
+extract structured scheduling intent, validates the result with deterministic
+calendar logic, stores a simulated appointment, and returns an SMS-style
+confirmation.
 
-This is a scheduling demo, not a medical device. It does not make diagnoses, does not
-send real SMS messages, and does not integrate with real clinic systems.
+This is a demo application, not a medical device. It does not diagnose patients,
+does not send real SMS messages, and does not integrate with real clinic systems.
 
-## What The Demo Shows
+## What Is Included
 
-- A patient records a Polish voice message in the browser.
-- The backend receives the audio file through FastAPI.
-- Local ASR transcribes the recording with `faster-whisper`.
-- Bielik analyzes the transcript in Polish.
-- Vector RAG retrieves appointment-duration rules from a Chroma index.
-- A deterministic scheduler checks calendar availability before creating an event.
-- The frontend shows the transcript/debug summary, SMS-style response, and calendar.
-
-## Architecture
-
-```mermaid
-flowchart LR
-    Browser["React app"] -->|audio upload| API["FastAPI backend"]
-    API --> ASR["faster-whisper ASR"]
-    ASR --> Transcript["Polish transcript"]
-    Transcript --> RAG["Chroma vector RAG"]
-    RAG --> Bielik["Bielik via Ollama HTTP"]
-    Bielik --> Intent["Validated appointment intent"]
-    Intent --> Scheduler["Deterministic scheduler"]
-    Scheduler --> Store["SQLite demo calendar"]
-    Scheduler --> Sms["Simulated SMS"]
-    Store --> Browser
-    Sms --> Browser
-```
-
-## Tech Stack
-
-Backend:
-
-- Python 3.11+
-- FastAPI and Uvicorn
-- Pydantic Settings
-- faster-whisper
-- Bielik through an Ollama-compatible HTTP API
-- ChromaDB and sentence-transformers for local vector RAG
-- SQLite demo persistence
-- pytest and ruff
-
-Frontend:
-
-- React
-- TypeScript
-- Vite
-- React Router
-- responsive custom CSS
-- lucide-react icons
+- React frontend with recording and calendar pages.
+- FastAPI backend.
+- `faster-whisper` speech-to-text for Polish audio.
+- Bielik through an Ollama-compatible HTTP API.
+- Chroma vector RAG over medical scheduling rules from `data/rag`.
+- Deterministic scheduler that prevents silent calendar conflicts.
+- SQLite demo calendar storage.
+- Google Cloud Run deployment scripts for backend, frontend, and Bielik.
 
 ## Repository Layout
 
 ```text
-backend/
-  app/
-    api/              FastAPI route modules
-    core/             settings and logging
-    models/           Pydantic request/response schemas
-    services/         ASR, Bielik, RAG, scheduling, SMS services
-    main.py           FastAPI application factory
-  tests/
-  pyproject.toml
-
-frontend/
-  src/
-    api/              typed backend client
-    components/       reusable UI components
-    pages/            recorder and calendar pages
-    types/            shared TypeScript API types
-  package.json
-  .env.example
-  .env.cloud.example
-
-data/
-  rag/                active RAG source documents
-  rag/examples/       optional starter rule datasets
-  rag/schema/         structured rule schema
-  samples/            local sample audio files, ignored by Git
-
-deploy/
-  docker-compose.local.yml
-  cloud-run/
-  ollama-bielik/
-  ollama-embedding/
-
-docs/
-  architecture.md
-  requirements.md
-  local-models.md
+backend/                 FastAPI backend and pytest suite
+frontend/                React/Vite frontend
+data/rag/                RAG source documents with appointment rules
+deploy/cloud-run/        Google Cloud Run deployment scripts
+deploy/ollama-bielik/    Bielik/Ollama Cloud Run image
+tools/                   Demo smoke-test tooling
 ```
 
-## Runtime Profiles
+## Local Run Step By Step
 
-The repository ships two environment templates:
+These steps assume Windows PowerShell and a PC with a CUDA-capable GPU.
 
-- `.env.example.local-ollama` for local development with a local Ollama-compatible Bielik server.
-- `.env.example.cloud-run` for Cloud Run-style deployments where the backend calls model services over HTTP.
+### 1. Clone The Repository
 
-The plain `.env.example` only explains which profile to copy. It intentionally contains
-no private model paths or machine-specific configuration.
+```powershell
+git clone https://github.com/SzymczykMarcin/medical-scheduling-agent.git
+cd medical-scheduling-agent
+```
 
-## Local Quick Start
-
-These commands assume PowerShell on Windows.
-
-### 1. Prepare Environment
-
-From the repository root:
+### 2. Create The Local Environment File
 
 ```powershell
 Copy-Item .env.example.local-ollama .env
@@ -124,30 +52,27 @@ Copy-Item .env.example.local-ollama .env
 
 The local profile expects:
 
-- backend at `http://127.0.0.1:8097`
-- frontend at `http://localhost:5173`
-- Bielik model server at `http://127.0.0.1:11434`
-- vector RAG index under `data/chroma`
-- RAG source files under `data/rag`
-- demo calendar events in SQLite at `data/demo.sqlite3`
+- backend: `http://127.0.0.1:8097`
+- frontend: `http://localhost:5173`
+- Bielik/Ollama: `http://127.0.0.1:11434`
+- RAG index: `data/chroma`
+- calendar database: `data/demo.sqlite3`
 
-### 2. Start Bielik Model Server
+### 3. Start Bielik Locally
 
-Use any Ollama-compatible server that exposes `/api/chat`.
-
-With Ollama installed locally:
+Open terminal 1:
 
 ```powershell
 ollama serve
 ```
 
-In another terminal:
+Open terminal 2 and download the Bielik model:
 
 ```powershell
 ollama pull SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0
 ```
 
-Smoke test:
+Check that Bielik answers:
 
 ```powershell
 Invoke-RestMethod `
@@ -156,14 +81,14 @@ Invoke-RestMethod `
   -ContentType "application/json" `
   -Body '{
     "model": "SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0",
-    "messages": [{"role": "user", "content": "Odpowiedz jednym zdaniem po polsku."}],
+    "messages": [{"role": "user", "content": "Odpowiedz jednym zdaniem po polsku: gotowe."}],
     "stream": false
   }'
 ```
 
-Alternative Docker Compose assets are available in `deploy/docker-compose.local.yml`.
+### 4. Install The Backend
 
-### 3. Install Backend
+Open terminal 3:
 
 ```powershell
 cd backend
@@ -174,12 +99,9 @@ pip install -e ".[dev]"
 cd ..
 ```
 
-### 4. Build The Vector RAG Index
+### 5. Start The Backend
 
-RAG source files live in `data/rag`. The files are source knowledge, not the retrieval
-backend. Retrieval becomes vector RAG only after the Chroma index is built.
-
-Start the backend:
+In terminal 3:
 
 ```powershell
 cd backend
@@ -187,15 +109,21 @@ cd backend
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8097
 ```
 
-In another terminal, rebuild the index:
+### 6. Build RAG And Prewarm Models
+
+Open terminal 4:
 
 ```powershell
 Invoke-RestMethod -Uri http://127.0.0.1:8097/api/rag/ingest -Method Post
+Invoke-RestMethod -Uri http://127.0.0.1:8097/api/debug/prewarm -Method Post
 ```
 
-Run ingestion again after changing rules under `data/rag`.
+The first prewarm call loads `faster-whisper` and may download the ASR model.
+If Bielik, RAG, or ASR is not configured correctly, this step fails visibly.
 
-### 5. Install And Start Frontend
+### 7. Install And Start The Frontend
+
+Open terminal 5:
 
 ```powershell
 cd frontend
@@ -209,122 +137,129 @@ Open:
 http://localhost:5173
 ```
 
-The recorder page sends audio to:
+### 8. Run A Local Smoke Test
 
-```text
-http://127.0.0.1:8097/api/voice/appointments
-```
-
-The calendar page loads events from the backend automatically.
-
-For a deployed backend, copy the frontend cloud template and set the public API URL:
-
-```powershell
-cd frontend
-Copy-Item .env.cloud.example .env
-```
-
-```env
-VITE_API_BASE_URL=https://your-backend-service-url
-```
-
-## Manual Smoke Tests
-
-Backend health:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8097/health
-```
-
-Expected fields include:
-
-- `status`
-- `runtime_profile`
-- `llm_provider`
-- `rag_backend`
-- `asr_provider`
-
-RAG ingestion:
-
-```powershell
-Invoke-RestMethod -Uri http://127.0.0.1:8097/api/rag/ingest -Method Post
-```
-
-Calendar:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8097/api/calendar/events
-```
-
-Debug text analysis without recording audio:
-
-```powershell
-Invoke-RestMethod `
-  -Uri http://127.0.0.1:8097/api/debug/appointment-analysis `
-  -Method Post `
-  -ContentType "application/json" `
-  -Body '{"transcript":"Dzień dobry, boli mnie głowa i chciałbym krótką wizytę we wtorek po 10."}'
-```
-
-Or run the scripted smoke check:
+In terminal 4:
 
 ```powershell
 python tools/run_demo_smoke.py --backend-url http://127.0.0.1:8097
 ```
 
-The script writes `reports/demo_smoke_report.json`.
+The smoke report is written to:
+
+```text
+reports/demo_smoke_report.json
+```
+
+## Google Cloud Run Step By Step
+
+These steps are intended for Google Cloud Shell or another shell with `gcloud`
+configured.
+
+Before starting, make sure your Google Cloud project has:
+
+- billing enabled,
+- Cloud Run GPU quota for NVIDIA L4 in the selected region,
+- permission to create Cloud Run services, service accounts, IAM bindings,
+  Artifact Registry repositories, and Cloud Build jobs.
+
+### 1. Clone The Repository
+
+```bash
+git clone https://github.com/SzymczykMarcin/medical-scheduling-agent.git
+cd medical-scheduling-agent
+```
+
+### 2. Select Project And Region
+
+```bash
+export PROJECT_ID="your-google-cloud-project-id"
+export REGION="europe-west1"
+gcloud config set project "${PROJECT_ID}"
+```
+
+Use a region where Cloud Run GPUs are available for your project.
+
+### 3. Deploy The Whole Demo
+
+```bash
+./deploy/cloud-run/deploy-demo.sh
+```
+
+This script performs the full demo deployment:
+
+1. Enables required Google APIs.
+2. Creates the backend service account if missing.
+3. Builds and deploys private Bielik/Ollama Cloud Run with NVIDIA L4 GPU.
+4. Grants the backend service account access to the private Bielik service.
+5. Builds and deploys the public FastAPI backend.
+6. Builds and deploys the public React frontend.
+7. Reconfigures backend CORS to the real frontend URL.
+8. Runs RAG ingestion.
+9. Runs model prewarm for Bielik and `faster-whisper`.
+10. Runs a basic smoke test.
+11. Prints backend, Bielik, and frontend URLs.
+
+The first run can take a long time because Cloud Build pulls Bielik into the
+model image, RAG ingestion downloads the embedding model, and prewarm downloads
+or loads the ASR model. These steps are expected. If a model cannot be downloaded
+or a service cannot be reached, the script fails instead of using a fake fallback.
+
+### 4. Open The Frontend
+
+At the end of the script, copy the printed frontend URL and open it in a browser.
+
+The deployed frontend already contains the correct backend URL. You do not need
+to edit `VITE_API_BASE_URL` manually when using `deploy-demo.sh`.
+
+### 5. Optional Manual Checks
+
+Use the backend URL printed by the script:
+
+```bash
+curl "https://your-backend-url/health"
+curl "https://your-backend-url/api/calendar/events"
+python tools/run_demo_smoke.py --backend-url "https://your-backend-url"
+```
+
+To rerun preparation after changing RAG documents:
+
+```bash
+curl -fsS -X POST "https://your-backend-url/api/rag/ingest"
+curl -fsS -X POST "https://your-backend-url/api/debug/prewarm"
+```
 
 ## Customizing Medical Rules
 
 Put clinic-specific rules under `data/rag`.
 
-Supported active formats:
+Supported formats:
 
 - Markdown
 - text
 - CSV
 - JSONL
 
-Structured rules should describe:
+After changing rules, rebuild the vector index:
 
-- `procedure_name`
-- `specialty`
-- `duration_minutes`
-- `duration_rationale`
-- `patient_preparation`
-- `contraindications_for_auto_booking`
-- `source`
-
-Examples are available in `data/rag/examples`. Copy example files into `data/rag`
-or replace them with a clinic-specific rule set. After each change, run:
+Local:
 
 ```powershell
 Invoke-RestMethod -Uri http://127.0.0.1:8097/api/rag/ingest -Method Post
 ```
 
-The scheduler supports visit durations normalized to `30`, `60`, `90`, and `120`
-minutes.
+Cloud:
 
-## Storage Strategy
-
-Local development uses SQLite for the simulated appointment calendar:
-
-```env
-CALENDAR_STORAGE_BACKEND=sqlite
-SQLITE_DATABASE_URL=sqlite:///data/demo.sqlite3
-SEED_DEMO_CALENDAR=true
+```bash
+curl -fsS -X POST "https://your-backend-url/api/rag/ingest"
 ```
 
-This keeps booked demo appointments available across backend restarts on one
-developer machine. Focused unit tests can still use the in-memory repository.
+The scheduler supports visit durations normalized to `30`, `60`, `90`, and
+`120` minutes.
 
-The vector RAG source of truth is the document set under `data/rag`. The Chroma
-index under `data/chroma` is generated data and can be rebuilt with
-`POST /api/rag/ingest`.
+## Tests
 
-## Testing
-
-Backend checks:
+Backend:
 
 ```powershell
 cd backend
@@ -333,126 +268,27 @@ python -m ruff check .
 python -m pytest tests -m "not local_ai"
 ```
 
-Local AI acceptance tests are marked separately because they load real models:
-
-```powershell
-python -m pytest tests -m local_ai
-```
-
-Frontend build:
+Frontend:
 
 ```powershell
 cd frontend
 npm run build
 ```
 
-## Cloud Run Deployment Direction
-
-The cloud profile is intentionally explicit:
+Local AI acceptance tests load real local models:
 
 ```powershell
-Copy-Item .env.example.cloud-run .env
+cd backend
+.\.venv\Scripts\Activate.ps1
+python -m pytest tests -m local_ai
 ```
 
-Set at least:
+## Demo Safety Rules
 
-- `CORS_ORIGINS` to your frontend URL.
-- `OLLAMA_BASE_URL` to the deployed Bielik model service URL.
-- storage paths suitable for your runtime.
-
-Deployment helper scripts live in:
-
-- `deploy/cloud-run/deploy-demo.sh`
-- `deploy/cloud-run/backend-cloud-run.sh`
-- `deploy/cloud-run/frontend-cloud-run.sh`
-- `deploy/cloud-run/bielik-cloud-run.sh`
-- `deploy/cloud-run/embedding-cloud-run.sh`
-
-They are parameterized through environment variables such as `PROJECT_ID`, `REGION`,
-and service names. The current cloud assets are meant for a self-hosted demo:
-clone the repository, deploy into your own cloud project, and adjust the env files.
-
-Recommended Cloud Run demo flow:
-
-```bash
-export PROJECT_ID="your-project-id"
-export REGION="europe-west1"
-./deploy/cloud-run/deploy-demo.sh
-```
-
-The script enables required Google APIs, creates a backend service account,
-deploys private Bielik Cloud Run, grants the backend `roles/run.invoker`, deploys
-the public backend, deploys the React frontend as a public Cloud Run service,
-updates backend CORS to the frontend URL, rebuilds the RAG index, prewarms ASR
-and Bielik, and runs a basic connectivity smoke test.
-
-The first deployment can take a while because Cloud Build pulls the Bielik model
-into the model service image and the backend prewarm step downloads the
-`faster-whisper` ASR model. These downloads are expected and should be visible in
-Cloud Build and Cloud Run logs. If any model cannot be downloaded, the script
-fails instead of silently switching to a fake fallback.
-
-After the script finishes, it prints:
-
-- backend URL,
-- Bielik service URL,
-- frontend URL.
-
-Open the frontend URL in a browser and test the demo from there.
-
-If you want to run the preparation steps manually after a deployment:
-
-```bash
-curl -fsS -X POST "https://your-backend-url/api/rag/ingest"
-curl -fsS -X POST "https://your-backend-url/api/debug/prewarm"
-python tools/run_demo_smoke.py --backend-url "https://your-backend-url"
-```
-
-The default cloud backend profile uses CPU ASR (`ASR_DEVICE=cpu`,
-`ASR_COMPUTE_TYPE=int8`) to keep the public demo easier to deploy. The Chroma
-index and SQLite database use `/tmp` paths in the template, so they are temporary.
-
-For durable cloud storage, set:
-
-```env
-CLOUD_STORAGE_MODE=persistent
-CALENDAR_STORAGE_BACKEND=sql
-DATABASE_URL=postgresql+psycopg://...
-```
-
-`DATABASE_URL` should point to durable database storage, for example a Cloud SQL
-Postgres connection exposed to the container.
-
-For durable managed vector RAG, use the BigQuery Vector backend:
-
-```env
-RAG_BACKEND=bigquery-vector
-RAG_INDEX_MODE=managed-vector
-BIGQUERY_PROJECT_ID=your-project-id
-BIGQUERY_DATASET_ID=rag_dataset
-BIGQUERY_TABLE_ID=medical_scheduling_rules
-```
-
-Install backend cloud extras in environments that use managed storage:
-
-```bash
-pip install -e "backend[cloud]"
-```
-
-## Safety And Scope
-
-- The assistant schedules appointments only.
+- The system schedules appointments only.
 - It must not diagnose patients.
-- If the model output is invalid, uncertain, or conflicts with calendar rules, the
-  backend returns a callback-needed SMS instead of silently booking an appointment.
-- There are no silent LLM/RAG fallbacks. Broken model or RAG configuration should fail
-  visibly during testing.
-
-## Useful Documentation
-
-- `docs/architecture.md`
-- `docs/requirements.md`
-- `docs/local-models.md`
-- `docs/demo-evaluation.md`
-- `data/rag/README.md`
-- `deploy/README.md`
+- Bielik proposes structured intent, but code validates the final calendar write.
+- If model output is invalid, uncertain, or conflicts with the calendar, the
+  backend returns a callback-needed SMS instead of silently booking.
+- Broken model, RAG, or ASR configuration should fail visibly during setup or
+  testing.

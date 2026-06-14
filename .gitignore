@@ -230,6 +230,7 @@ data/samples/*
 reports/
 
 # Local project notes and runtime artifacts
+docs/
 docs/upgrade-plan/
 backend/logs/
 *.tmp
