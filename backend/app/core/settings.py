@@ -32,11 +32,7 @@ class Settings(BaseSettings):
     asr_compute_type: str = "int8_float16"
     max_audio_upload_mb: int = 50
 
-    llm_provider: Literal["llama-cpp", "ollama-http"] = "ollama-http"
-    bielik_gguf_path: str = ""
-    llm_context_tokens: int = 4096
-    llm_gpu_layers: int = -1
-    llm_threads: int | None = None
+    llm_provider: Literal["ollama-http"] = "ollama-http"
     llm_max_new_tokens: int = 512
     llm_temperature: float = 0.1
     ollama_base_url: str = "http://127.0.0.1:11434"
@@ -68,9 +64,7 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_provider_configuration(self) -> "Settings":
         """Validate selected provider configuration without exposing secrets."""
-        if self.llm_provider == "llama-cpp" and not self.bielik_gguf_path.strip():
-            raise ValueError("BIELIK_GGUF_PATH is required when LLM_PROVIDER=llama-cpp.")
-        if self.llm_provider == "ollama-http" and not self.ollama_base_url.strip():
+        if not self.ollama_base_url.strip():
             raise ValueError("OLLAMA_BASE_URL is required when LLM_PROVIDER=ollama-http.")
         if self.rag_backend == "bigquery-vector" and not self.bigquery_project_id:
             raise ValueError("BIGQUERY_PROJECT_ID is required when RAG_BACKEND=bigquery-vector.")

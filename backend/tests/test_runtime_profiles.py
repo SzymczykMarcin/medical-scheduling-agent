@@ -18,8 +18,6 @@ def test_local_ollama_profile_parses_without_private_paths() -> None:
     assert settings.rag_backend == "chroma"
     assert settings.calendar_storage_backend == "sqlite"
     assert settings.cloud_storage_mode == "ephemeral"
-    assert "C:/" not in settings.bielik_gguf_path
-    assert "C:\\" not in settings.bielik_gguf_path
 
 
 def test_cloud_run_profile_parses_without_private_paths_or_project_ids() -> None:
@@ -41,11 +39,6 @@ def test_cloud_run_profile_parses_without_private_paths_or_project_ids() -> None
     assert "C:\\" not in content
     assert "/Users/" not in content
     assert "\\Users\\" not in content
-
-
-def test_llama_cpp_requires_explicit_model_path() -> None:
-    with pytest.raises(ValidationError, match="BIELIK_GGUF_PATH"):
-        Settings(llm_provider="llama-cpp", bielik_gguf_path="")
 
 
 def test_ollama_http_requires_base_url() -> None:

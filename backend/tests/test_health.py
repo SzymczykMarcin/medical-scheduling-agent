@@ -10,10 +10,9 @@ def test_health() -> None:
     body = response.json()
     assert body["status"] == "ok"
     assert body["runtime_profile"]
-    assert body["llm_provider"] in {"llama-cpp", "ollama-http"}
+    assert body["llm_provider"] == "ollama-http"
     assert body["rag_backend"] in {"chroma", "bigquery-vector"}
     assert body["asr_provider"]
     assert body["calendar_storage_backend"] in {"memory", "sqlite", "sql"}
     assert body["cloud_storage_mode"] in {"ephemeral", "persistent"}
-    assert "BIELIK_GGUF_PATH" not in body
     assert "OLLAMA_BASE_URL" not in body
