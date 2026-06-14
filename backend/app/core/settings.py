@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0"
     ollama_timeout_seconds: float = 120.0
+    ollama_auth_mode: Literal["none", "google-id-token"] = "none"
 
     embedding_model_name: str = "sdadas/mmlw-retrieval-roberta-large"
     rag_backend: Literal["chroma", "bigquery-vector"] = "chroma"

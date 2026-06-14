@@ -362,6 +362,7 @@ Set at least:
 
 Deployment helper scripts live in:
 
+- `deploy/cloud-run/deploy-demo.sh`
 - `deploy/cloud-run/backend-cloud-run.sh`
 - `deploy/cloud-run/bielik-cloud-run.sh`
 - `deploy/cloud-run/embedding-cloud-run.sh`
@@ -370,17 +371,18 @@ They are parameterized through environment variables such as `PROJECT_ID`, `REGI
 and service names. The current cloud assets are meant for a self-hosted demo:
 clone the repository, deploy into your own cloud project, and adjust the env files.
 
-Minimal Cloud Run order:
+Recommended Cloud Run demo flow:
 
 ```bash
 export PROJECT_ID="your-project-id"
 export REGION="europe-west1"
-./deploy/cloud-run/bielik-cloud-run.sh
-
 export FRONTEND_ORIGIN="https://your-frontend.example.com"
-export OLLAMA_BASE_URL="https://your-bielik-service-url"
-./deploy/cloud-run/backend-cloud-run.sh
+./deploy/cloud-run/deploy-demo.sh
 ```
+
+The script enables required Google APIs, creates a backend service account,
+deploys private Bielik Cloud Run, grants the backend `roles/run.invoker`, deploys
+the public backend, and prints the `VITE_API_BASE_URL` value for the frontend.
 
 The default cloud backend profile uses CPU ASR (`ASR_DEVICE=cpu`,
 `ASR_COMPUTE_TYPE=int8`) to keep the public demo easier to deploy. The Chroma

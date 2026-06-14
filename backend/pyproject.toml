@@ -28,6 +28,7 @@ dev = [
     "httpx>=0.27.0",
 ]
 cloud = [
+    "google-auth>=2.35.0",
     "google-cloud-bigquery>=3.25.0",
     "psycopg[binary]>=3.2.0",
 ]

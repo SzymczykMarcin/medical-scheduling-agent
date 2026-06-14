@@ -76,7 +76,25 @@ curl http://127.0.0.1:11435/api/embed \
 
 Cloud Run scripts are parameterized. They require environment variables instead of hardcoded project IDs.
 
-Deploy the Bielik model service first:
+The recommended self-hosted demo path is:
+
+```bash
+export PROJECT_ID="your-project-id"
+export REGION="europe-west1"
+export FRONTEND_ORIGIN="https://your-frontend.example.com"
+./deploy/cloud-run/deploy-demo.sh
+```
+
+`deploy-demo.sh` does the glue work:
+
+- enables required Google APIs,
+- creates a backend service account when it is missing,
+- deploys private Bielik Cloud Run,
+- grants the backend service account `roles/run.invoker` on Bielik,
+- deploys public backend Cloud Run with `OLLAMA_AUTH_MODE=google-id-token`,
+- prints the backend URL and `VITE_API_BASE_URL` value.
+
+Manual deployment is still possible. Deploy the Bielik model service first:
 
 ```bash
 export PROJECT_ID="your-project-id"
@@ -87,8 +105,6 @@ export REGION="europe-west1"
 Deploy the backend after you know the Bielik service URL:
 
 ```bash
-export PROJECT_ID="your-project-id"
-export REGION="europe-west1"
 export FRONTEND_ORIGIN="https://your-frontend.example.com"
 export OLLAMA_BASE_URL="https://your-bielik-service-url"
 ./deploy/cloud-run/backend-cloud-run.sh
@@ -142,9 +158,9 @@ npm run build
 ### Storage Notes
 
 The current Cloud Run profile stores Chroma and SQLite under `/tmp`. That is
-acceptable for a short-lived demo, but it is not persistent. A production-quality
-deployment should replace this with durable storage or a managed vector database
-and a managed relational database.
+acceptable for a short-lived self-hosted demo, but it is not persistent. A more
+durable demo should replace this with durable storage or managed vector/database
+services.
 
 The backend exposes this explicitly through:
 
@@ -178,6 +194,7 @@ BIGQUERY_TABLE_ID=medical_scheduling_rules
 
 See:
 
+- `deploy/cloud-run/deploy-demo.sh`
 - `deploy/cloud-run/backend-cloud-run.sh`
 - `deploy/cloud-run/bielik-cloud-run.sh`
 - `deploy/cloud-run/embedding-cloud-run.sh`

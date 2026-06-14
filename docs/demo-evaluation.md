@@ -24,6 +24,10 @@ It writes a JSON report to:
 reports/demo_smoke_report.json
 ```
 
+Use `--basic-only` for an immediate post-deploy connectivity check. This checks
+only `/health` and `/api/calendar/events`, so it is safe to run before the RAG
+index or the model service has warmed up.
+
 Use `--skip-rag-ingest` when the vector index is managed externally and should
 not be rebuilt during the smoke test.
 

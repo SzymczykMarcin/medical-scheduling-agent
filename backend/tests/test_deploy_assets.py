@@ -14,6 +14,7 @@ def test_model_server_deployment_assets_exist() -> None:
         DEPLOY_DIR / "docker-compose.local.yml",
         DEPLOY_DIR / "ollama-bielik" / "Dockerfile",
         DEPLOY_DIR / "ollama-embedding" / "Dockerfile",
+        DEPLOY_DIR / "cloud-run" / "deploy-demo.sh",
         DEPLOY_DIR / "cloud-run" / "backend-cloud-run.sh",
         DEPLOY_DIR / "cloud-run" / "bielik-cloud-run.sh",
         DEPLOY_DIR / "cloud-run" / "embedding-cloud-run.sh",
@@ -84,12 +85,14 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert ": \"${REGION:?" in content
     assert ": \"${FRONTEND_ORIGIN:?" in content
     assert ": \"${OLLAMA_BASE_URL:?" in content
+    assert "BACKEND_SERVICE_ACCOUNT_EMAIL" in content
     assert "gcloud artifacts repositories describe" in content
     assert "gcloud artifacts repositories create" in content
     assert "gcloud builds submit" in content
     assert "gcloud run deploy" in content
     assert "--allow-unauthenticated" in content
     assert "RUNTIME_PROFILE=cloud-run" in content
+    assert "OLLAMA_AUTH_MODE=${OLLAMA_AUTH_MODE}" in content
     assert "ASR_DEVICE=${ASR_DEVICE}" in content
     assert "RAG_BACKEND=${RAG_BACKEND}" in content
     assert "CALENDAR_STORAGE_BACKEND=${CALENDAR_STORAGE_BACKEND}" in content
@@ -105,6 +108,23 @@ def test_backend_dockerfile_contains_cloud_run_entrypoint() -> None:
     assert "COPY data/rag" in content
     assert 'python -m pip install ".[cloud]"' in content
     assert "uvicorn app.main:app" in content
+
+
+def test_demo_cloud_run_script_wires_private_model_to_public_backend() -> None:
+    content = (DEPLOY_DIR / "cloud-run" / "deploy-demo.sh").read_text(encoding="utf-8")
+
+    assert ": \"${PROJECT_ID:?" in content
+    assert ": \"${REGION:?" in content
+    assert ": \"${FRONTEND_ORIGIN:?" in content
+    assert "gcloud services enable" in content
+    assert "gcloud iam service-accounts create" in content
+    assert "bielik-cloud-run.sh" in content
+    assert "gcloud run services add-iam-policy-binding" in content
+    assert "roles/run.invoker" in content
+    assert 'OLLAMA_AUTH_MODE="google-id-token"' in content
+    assert "backend-cloud-run.sh" in content
+    assert "VITE_API_BASE_URL=" in content
+    assert "--basic-only" in content
 
 
 def test_ci_runs_backend_and_frontend_checks() -> None:

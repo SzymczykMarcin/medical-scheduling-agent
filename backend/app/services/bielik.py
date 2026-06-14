@@ -3,6 +3,7 @@ import os
 import platform
 import threading
 import json
+import subprocess
 from collections.abc import Callable
 from pathlib import Path
 from site import getusersitepackages
@@ -26,7 +27,7 @@ class LlamaModelProtocol(Protocol):
 
 
 ModelFactory = Callable[[Path, Settings], LlamaModelProtocol]
-JsonPost = Callable[[str, dict[str, Any], float], dict[str, Any]]
+JsonPost = Callable[[str, dict[str, Any], float, dict[str, str] | None], dict[str, Any]]
 
 
 class BielikProviderProtocol(Protocol):
@@ -159,6 +160,7 @@ class OllamaHttpBielikProvider:
                 },
             }
             url = _join_url(self.settings.ollama_base_url, "/api/chat")
+            headers = self._auth_headers()
             prompt_chars = sum(len(message.content) for message in messages)
             logger.info(
                 "Starting Bielik generation provider=ollama-http base_url=%s model=%s "
@@ -169,7 +171,12 @@ class OllamaHttpBielikProvider:
             )
 
             try:
-                response = self._post_json(url, payload, self.settings.ollama_timeout_seconds)
+                response = self._post_json(
+                    url,
+                    payload,
+                    self.settings.ollama_timeout_seconds,
+                    headers,
+                )
             except LlmGenerationError:
                 raise
             except Exception as exc:
@@ -187,6 +194,14 @@ class OllamaHttpBielikProvider:
                 len(text),
             )
             return text
+
+    def _auth_headers(self) -> dict[str, str] | None:
+        if self.settings.ollama_auth_mode == "none":
+            return None
+        if self.settings.ollama_auth_mode == "google-id-token":
+            token = fetch_google_id_token(self.settings.ollama_base_url)
+            return {"Authorization": f"Bearer {token}"}
+        raise LlmGenerationError(f"Unsupported Ollama auth mode: {self.settings.ollama_auth_mode}")
 
 
 def create_llama_cpp_model(model_path: Path, settings: Settings) -> LlamaModelProtocol:
@@ -216,12 +231,56 @@ def create_llama_cpp_model(model_path: Path, settings: Settings) -> LlamaModelPr
     )
 
 
-def post_json(url: str, payload: dict[str, Any], timeout_seconds: float) -> dict[str, Any]:
+def fetch_google_id_token(audience: str) -> str:
+    """Fetch a Google identity token for private Cloud Run service-to-service calls."""
+    try:
+        import google.auth.transport.requests
+        import google.oauth2.id_token
+    except ImportError as exc:
+        raise LlmGenerationError(
+            "google-auth is required when OLLAMA_AUTH_MODE=google-id-token."
+        ) from exc
+
+    try:
+        auth_request = google.auth.transport.requests.Request()
+        return str(google.oauth2.id_token.fetch_id_token(auth_request, audience))
+    except Exception as exc:
+        logger.warning(
+            "Google metadata token fetch failed audience=%s error=%s; trying gcloud fallback.",
+            audience,
+            exc,
+        )
+
+    try:
+        completed = subprocess.run(
+            ["gcloud", "auth", "print-identity-token"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except Exception as exc:
+        raise LlmGenerationError("Could not fetch Google identity token.") from exc
+
+    token = completed.stdout.strip()
+    if not token:
+        raise LlmGenerationError("Google identity token command returned an empty token.")
+    return token
+
+
+def post_json(
+    url: str,
+    payload: dict[str, Any],
+    timeout_seconds: float,
+    headers: dict[str, str] | None = None,
+) -> dict[str, Any]:
     """POST JSON to an HTTP endpoint and return the decoded JSON object."""
+    request_headers = {"Content-Type": "application/json"}
+    if headers:
+        request_headers.update(headers)
     request = Request(
         url=url,
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers=request_headers,
         method="POST",
     )
     try:

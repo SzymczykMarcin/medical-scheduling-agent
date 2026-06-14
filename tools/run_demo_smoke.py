@@ -27,6 +27,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run Medical Scheduling Agent demo smoke checks.")
     parser.add_argument("--backend-url", default="http://127.0.0.1:8097")
     parser.add_argument("--transcript", default=DEFAULT_TRANSCRIPT)
+    parser.add_argument(
+        "--basic-only",
+        action="store_true",
+        help="Check only backend readiness and calendar API connectivity.",
+    )
     parser.add_argument("--skip-rag-ingest", action="store_true")
     parser.add_argument(
         "--report",
@@ -39,6 +44,7 @@ def main() -> int:
     checks = run_smoke_checks(
         backend_url=backend_url,
         transcript=args.transcript,
+        basic_only=args.basic_only,
         skip_rag_ingest=args.skip_rag_ingest,
     )
     write_report(Path(args.report), backend_url, checks)
@@ -49,6 +55,7 @@ def main() -> int:
 def run_smoke_checks(
     backend_url: str,
     transcript: str,
+    basic_only: bool = False,
     skip_rag_ingest: bool = False,
 ) -> list[CheckResult]:
     """Run backend readiness checks in the same order a demo operator expects."""
@@ -56,6 +63,8 @@ def run_smoke_checks(
         _check_health(backend_url),
         _check_calendar(backend_url),
     ]
+    if basic_only:
+        return checks
     if not skip_rag_ingest:
         checks.append(_check_rag_ingest(backend_url))
     checks.append(_check_debug_analysis(backend_url, transcript))

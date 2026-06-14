@@ -47,3 +47,56 @@ def test_smoke_report_marks_failed_checks(tmp_path) -> None:
     content = report_path.read_text(encoding="utf-8")
     assert '"status": "fail"' in content
     assert "RAG is not ready" in content
+
+
+def test_basic_smoke_skips_rag_and_debug_checks(monkeypatch) -> None:
+    smoke_tool = load_smoke_tool()
+
+    monkeypatch.setattr(
+        smoke_tool,
+        "_check_health",
+        lambda backend_url: smoke_tool.CheckResult(
+            name="health",
+            status="pass",
+            elapsed_ms=1.0,
+            details={},
+        ),
+    )
+    monkeypatch.setattr(
+        smoke_tool,
+        "_check_calendar",
+        lambda backend_url: smoke_tool.CheckResult(
+            name="calendar_events",
+            status="pass",
+            elapsed_ms=1.0,
+            details={},
+        ),
+    )
+    monkeypatch.setattr(
+        smoke_tool,
+        "_check_rag_ingest",
+        lambda backend_url: smoke_tool.CheckResult(
+            name="rag_ingest",
+            status="fail",
+            elapsed_ms=1.0,
+            details={},
+        ),
+    )
+    monkeypatch.setattr(
+        smoke_tool,
+        "_check_debug_analysis",
+        lambda backend_url, transcript: smoke_tool.CheckResult(
+            name="debug_analysis",
+            status="fail",
+            elapsed_ms=1.0,
+            details={},
+        ),
+    )
+
+    checks = smoke_tool.run_smoke_checks(
+        backend_url="https://backend.example.com",
+        transcript="test",
+        basic_only=True,
+    )
+
+    assert [check.name for check in checks] == ["health", "calendar_events"]
