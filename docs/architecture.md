@@ -37,6 +37,17 @@ flowchart LR
 
 The calendar starts with deterministic seed appointments. Expert RAG source files live under `data/rag` and may be Markdown, text, CSV, or JSONL documents describing appointment categories, durations, and scheduling rules.
 
+## Calendar Storage
+
+The scheduler depends on a calendar repository boundary. Local application runs
+use SQLite by default, while focused tests can use an in-memory repository. The
+demo calendar is seeded only when the configured repository is empty, so booked
+appointments survive backend restarts when SQLite points to durable local storage.
+
+Cloud demo profiles are explicit about storage durability through
+`CLOUD_STORAGE_MODE`. The default Cloud Run profile uses `/tmp` and is therefore
+ephemeral. Persistent cloud storage must provide `DATABASE_URL`.
+
 ## RAG Backend Strategy
 
 RAG backend selection is explicit through `RAG_BACKEND`:

@@ -127,6 +127,7 @@ The local profile expects:
 - Bielik model server at `http://127.0.0.1:11434`
 - vector RAG index under `data/chroma`
 - RAG source files under `data/rag`
+- demo calendar events in SQLite at `data/demo.sqlite3`
 
 ### 2. Start Bielik Model Server
 
@@ -283,6 +284,23 @@ Invoke-RestMethod -Uri http://127.0.0.1:8097/api/rag/ingest -Method Post
 The scheduler supports visit durations normalized to `30`, `60`, `90`, and `120`
 minutes.
 
+## Storage Strategy
+
+Local development uses SQLite for the simulated appointment calendar:
+
+```env
+CALENDAR_STORAGE_BACKEND=sqlite
+SQLITE_DATABASE_URL=sqlite:///data/demo.sqlite3
+SEED_DEMO_CALENDAR=true
+```
+
+This keeps booked demo appointments available across backend restarts on one
+developer machine. Focused unit tests can still use the in-memory repository.
+
+The vector RAG source of truth is the document set under `data/rag`. The Chroma
+index under `data/chroma` is generated data and can be rebuilt with
+`POST /api/rag/ingest`.
+
 ## Testing
 
 Backend checks:
@@ -346,8 +364,21 @@ export OLLAMA_BASE_URL="https://your-bielik-service-url"
 
 The default cloud backend profile uses CPU ASR (`ASR_DEVICE=cpu`,
 `ASR_COMPUTE_TYPE=int8`) to keep the public demo easier to deploy. The Chroma
-index and SQLite database use `/tmp` paths in the template, so they are temporary
-and must be replaced for a durable deployment.
+index and SQLite database use `/tmp` paths in the template, so they are temporary.
+
+For durable cloud storage, set:
+
+```env
+CLOUD_STORAGE_MODE=persistent
+DATABASE_URL=...
+```
+
+`DATABASE_URL` should point to durable database storage, for example a Cloud SQL
+connection exposed to the container after a matching SQL driver/repository is
+added. The current committed implementation provides the storage boundary and
+SQLite persistence; managed cloud database support is the next extension point.
+Durable vector RAG should use a persistent vector backend or a deploy-time rebuild
+process from durable rule sources.
 
 ## Safety And Scope
 

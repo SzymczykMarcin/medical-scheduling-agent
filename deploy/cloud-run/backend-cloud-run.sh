@@ -42,5 +42,5 @@ gcloud run deploy "${BACKEND_SERVICE}" \
   --memory "${BACKEND_MEMORY}" \
   --timeout 600 \
   --max-instances "${BACKEND_MAX_INSTANCES}" \
-  --set-env-vars "RUNTIME_PROFILE=cloud-run,BACKEND_HOST=0.0.0.0,BACKEND_PORT=8080,CORS_ORIGINS=${FRONTEND_ORIGIN},DEMO_MODE=false,ASR_PROVIDER=faster-whisper,ASR_MODEL_NAME=${ASR_MODEL_NAME},ASR_DEVICE=${ASR_DEVICE},ASR_COMPUTE_TYPE=${ASR_COMPUTE_TYPE},LLM_PROVIDER=ollama-http,OLLAMA_BASE_URL=${OLLAMA_BASE_URL},OLLAMA_MODEL=${OLLAMA_MODEL},RAG_BACKEND=chroma,CHROMA_PERSIST_DIR=/tmp/medical-scheduling-agent/chroma,RAG_DOCUMENT_DIR=/app/data/rag,SQLITE_DATABASE_URL=sqlite:////tmp/medical-scheduling-agent/demo.sqlite3" \
+  --set-env-vars "RUNTIME_PROFILE=cloud-run,BACKEND_HOST=0.0.0.0,BACKEND_PORT=8080,CORS_ORIGINS=${FRONTEND_ORIGIN},DEMO_MODE=false,ASR_PROVIDER=faster-whisper,ASR_MODEL_NAME=${ASR_MODEL_NAME},ASR_DEVICE=${ASR_DEVICE},ASR_COMPUTE_TYPE=${ASR_COMPUTE_TYPE},LLM_PROVIDER=ollama-http,OLLAMA_BASE_URL=${OLLAMA_BASE_URL},OLLAMA_MODEL=${OLLAMA_MODEL},RAG_BACKEND=chroma,RAG_INDEX_MODE=local-chroma,CHROMA_PERSIST_DIR=/tmp/medical-scheduling-agent/chroma,RAG_DOCUMENT_DIR=/app/data/rag,CALENDAR_STORAGE_BACKEND=sqlite,SEED_DEMO_CALENDAR=true,CLOUD_STORAGE_MODE=ephemeral,SQLITE_DATABASE_URL=sqlite:////tmp/medical-scheduling-agent/demo.sqlite3" \
   --labels "app=medical-scheduling-agent,component=backend"

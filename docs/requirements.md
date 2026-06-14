@@ -36,6 +36,7 @@ Build a local-first demo system for scheduling medical appointments from Polish 
 ### Scheduling
 
 - The backend stores a simulated calendar.
+- The calendar storage backend is explicit and supports local SQLite persistence.
 - The backend finds the earliest available slot matching:
   - requested date/time preferences when possible,
   - estimated visit duration,
@@ -57,6 +58,7 @@ Build a local-first demo system for scheduling medical appointments from Polish 
 
 - Runs on a single developer PC.
 - Keeps AI model paths, model server URLs, and RAG backends configurable by environment variables.
+- Keeps calendar storage and cloud durability mode configurable by environment variables.
 - Supports demo mode only for intentional UI/backend development without real inference.
 - Avoids sending patient audio or text to external services.
 - Uses English documentation and code comments.
@@ -110,6 +112,17 @@ the model directly.
 | `bigquery-vector` | Cloud vector-search extension point | Configured, not implemented |
 
 Backend selection must be explicit. The system must not silently switch from a broken vector store to non-vector retrieval, because that would hide configuration failures during testing. Markdown/TXT files are source documents for ingestion, not a replacement for vector retrieval.
+
+## Calendar Storage Choices
+
+| Backend | Purpose | Status |
+| --- | --- | --- |
+| `sqlite` | Local and demo cloud calendar persistence | Default |
+| `memory` | Focused tests and temporary debug usage | Supported |
+
+Cloud profiles must also declare `CLOUD_STORAGE_MODE`. The default value
+`ephemeral` is honest demo mode. `persistent` requires `DATABASE_URL` and a
+repository implementation that supports the selected durable database.
 
 ## Medical Rule Source Formats
 

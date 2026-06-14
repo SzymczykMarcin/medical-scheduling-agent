@@ -126,6 +126,20 @@ acceptable for a short-lived demo, but it is not persistent. A production-qualit
 deployment should replace this with durable storage or a managed vector database
 and a managed relational database.
 
+The backend exposes this explicitly through:
+
+```env
+CLOUD_STORAGE_MODE=ephemeral
+CALENDAR_STORAGE_BACKEND=sqlite
+SQLITE_DATABASE_URL=sqlite:////tmp/medical-scheduling-agent/demo.sqlite3
+```
+
+Use `CLOUD_STORAGE_MODE=persistent` only when `DATABASE_URL` points to durable
+database storage. The application validates this so a cloud deployment does not
+quietly pretend that `/tmp` is persistent. The current repository implementation
+persists to SQLite; managed cloud database support should be added behind the
+same calendar repository boundary.
+
 See:
 
 - `deploy/cloud-run/backend-cloud-run.sh`

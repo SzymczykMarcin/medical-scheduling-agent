@@ -15,6 +15,8 @@ def test_local_ollama_profile_parses_without_private_paths() -> None:
     assert settings.llm_provider == "ollama-http"
     assert settings.ollama_base_url == "http://127.0.0.1:11434"
     assert settings.rag_backend == "chroma"
+    assert settings.calendar_storage_backend == "sqlite"
+    assert settings.cloud_storage_mode == "ephemeral"
     assert "C:/" not in settings.bielik_gguf_path
     assert "C:\\" not in settings.bielik_gguf_path
 
@@ -30,6 +32,9 @@ def test_cloud_run_profile_parses_without_private_paths_or_project_ids() -> None
     assert settings.rag_backend == "chroma"
     assert settings.asr_device == "cpu"
     assert settings.asr_compute_type == "int8"
+    assert settings.calendar_storage_backend == "sqlite"
+    assert settings.cloud_storage_mode == "ephemeral"
+    assert settings.rag_index_mode == "local-chroma"
     assert "C:/" not in content
     assert "C:\\" not in content
     assert "/Users/" not in content
@@ -44,3 +49,8 @@ def test_llama_cpp_requires_explicit_model_path() -> None:
 def test_ollama_http_requires_base_url() -> None:
     with pytest.raises(ValidationError, match="OLLAMA_BASE_URL"):
         Settings(llm_provider="ollama-http", ollama_base_url="")
+
+
+def test_persistent_cloud_storage_requires_database_url() -> None:
+    with pytest.raises(ValidationError, match="DATABASE_URL"):
+        Settings(runtime_profile="cloud-run", cloud_storage_mode="persistent", database_url=None)

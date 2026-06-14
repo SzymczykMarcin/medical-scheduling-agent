@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from app.models.appointment import AppointmentIntent, AppointmentStatus, PreferredTimeWindow
 from app.models.calendar import CalendarEvent
+from app.services.calendar_repository import CalendarRepository, MemoryCalendarRepository
 
 CLINIC_OPEN_HOUR = 9
 CLINIC_CLOSE_HOUR = 17
@@ -28,15 +29,23 @@ class SchedulingResult:
 
 
 class SchedulerService:
-    """Serve and update the in-memory demo appointment calendar."""
+    """Serve and update the demo appointment calendar."""
 
-    def __init__(self, today: date | None = None) -> None:
+    def __init__(
+        self,
+        today: date | None = None,
+        repository: CalendarRepository | None = None,
+        seed_if_empty: bool = True,
+    ) -> None:
         self._week_start = _week_start(today or date.today())
-        self._events: list[CalendarEvent] = build_seed_appointments(self._week_start)
+        self._repository = repository or MemoryCalendarRepository()
+        if seed_if_empty and self._repository.is_empty():
+            for event in build_seed_appointments(self._week_start):
+                self._repository.add_event(event)
 
     def list_events(self) -> list[CalendarEvent]:
         """Return appointments sorted by start date."""
-        return sorted(self._events, key=lambda event: event.start)
+        return self._repository.list_events()
 
     @property
     def week_start(self) -> date:
@@ -80,7 +89,7 @@ class SchedulerService:
             end=start + timedelta(minutes=duration_minutes),
             duration_minutes=duration_minutes,
         )
-        self._events.append(event)
+        self._repository.add_event(event)
         return SchedulingResult(
             status="scheduled",
             event=event,
@@ -132,7 +141,7 @@ class SchedulerService:
                 cursor = datetime.combine(next_day, time(hour=CLINIC_OPEN_HOUR))
 
     def _overlaps(self, start: datetime, end: datetime) -> bool:
-        return any(start < event.end and end > event.start for event in self._events)
+        return any(start < event.end and end > event.start for event in self.list_events())
 
     def _select_slot(self, intent: AppointmentIntent, duration_minutes: int) -> datetime | None:
         specific_slot = _parse_iso_datetime(intent.specific_datetime)
