@@ -119,6 +119,26 @@ curl "https://your-backend-url/api/calendar/events"
 Then configure the frontend API base URL to point at the backend URL and test a
 manual recording.
 
+For frontend builds:
+
+```bash
+cd frontend
+cp .env.cloud.example .env
+```
+
+Set:
+
+```env
+VITE_API_BASE_URL=https://your-backend-service-url
+```
+
+Then build with:
+
+```bash
+npm ci
+npm run build
+```
+
 ### Storage Notes
 
 The current Cloud Run profile stores Chroma and SQLite under `/tmp`. That is

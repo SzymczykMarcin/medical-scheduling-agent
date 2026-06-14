@@ -53,6 +53,7 @@ Build a local-first demo system for scheduling medical appointments from Polish 
 
 - The frontend displays seeded appointments.
 - After a successful voice scheduling request, the new appointment appears in the calendar.
+- The frontend API URL is configurable through `VITE_API_BASE_URL` for local and cloud demos.
 
 ## Non-Functional Requirements
 
@@ -156,6 +157,7 @@ Target model:
 - Medical diagnosis.
 - Production authentication and authorization.
 - Production-grade audit logging.
+- Shared multi-tenant hosting of one public production instance.
 
 ## References
 

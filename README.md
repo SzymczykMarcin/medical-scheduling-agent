@@ -79,6 +79,8 @@ frontend/
     pages/            recorder and calendar pages
     types/            shared TypeScript API types
   package.json
+  .env.example
+  .env.cloud.example
 
 data/
   rag/                active RAG source documents
@@ -215,6 +217,17 @@ http://127.0.0.1:8097/api/voice/appointments
 
 The calendar page loads events from the backend automatically.
 
+For a deployed backend, copy the frontend cloud template and set the public API URL:
+
+```powershell
+cd frontend
+Copy-Item .env.cloud.example .env
+```
+
+```env
+VITE_API_BASE_URL=https://your-backend-service-url
+```
+
 ## Manual Smoke Tests
 
 Backend health:
@@ -252,6 +265,14 @@ Invoke-RestMethod `
   -ContentType "application/json" `
   -Body '{"transcript":"Dzień dobry, boli mnie głowa i chciałbym krótką wizytę we wtorek po 10."}'
 ```
+
+Or run the scripted smoke check:
+
+```powershell
+python tools/run_demo_smoke.py --backend-url http://127.0.0.1:8097
+```
+
+The script writes `reports/demo_smoke_report.json`.
 
 ## Customizing Medical Rules
 
@@ -346,9 +367,8 @@ Deployment helper scripts live in:
 - `deploy/cloud-run/embedding-cloud-run.sh`
 
 They are parameterized through environment variables such as `PROJECT_ID`, `REGION`,
-and service names. The current cloud assets are a deployment starting point, not a
-complete production architecture. A production version should add authentication,
-persistent storage, observability, request limits, and secrets management.
+and service names. The current cloud assets are meant for a self-hosted demo:
+clone the repository, deploy into your own cloud project, and adjust the env files.
 
 Minimal Cloud Run order:
 
@@ -407,5 +427,6 @@ pip install -e "backend[cloud]"
 - `docs/architecture.md`
 - `docs/requirements.md`
 - `docs/local-models.md`
+- `docs/demo-evaluation.md`
 - `data/rag/README.md`
 - `deploy/README.md`
