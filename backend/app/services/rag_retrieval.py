@@ -86,8 +86,15 @@ class ChromaKnowledgeBaseRetriever:
             except ImportError as exc:
                 raise RagAnalysisError("sentence-transformers is not installed.") from exc
 
-            logger.info("Loading embedding model=%s", self.settings.embedding_model_name)
-            self._embedding_model = SentenceTransformer(self.settings.embedding_model_name)
+            logger.info(
+                "Loading embedding model=%s device=%s",
+                self.settings.embedding_model_name,
+                self.settings.embedding_device,
+            )
+            self._embedding_model = SentenceTransformer(
+                self.settings.embedding_model_name,
+                device=self.settings.embedding_device,
+            )
             logger.info("Embedding model loaded successfully.")
 
         return self._embedding_model
@@ -198,8 +205,15 @@ class BigQueryVectorKnowledgeBaseRetriever:
             except ImportError as exc:
                 raise RagAnalysisError("sentence-transformers is not installed.") from exc
 
-            logger.info("Loading embedding model=%s", self.settings.embedding_model_name)
-            self._embedding_model = SentenceTransformer(self.settings.embedding_model_name)
+            logger.info(
+                "Loading embedding model=%s device=%s",
+                self.settings.embedding_model_name,
+                self.settings.embedding_device,
+            )
+            self._embedding_model = SentenceTransformer(
+                self.settings.embedding_model_name,
+                device=self.settings.embedding_device,
+            )
         return self._embedding_model
 
     def _get_bigquery_client(self) -> Any:

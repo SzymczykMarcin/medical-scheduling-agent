@@ -89,6 +89,29 @@ BACKEND_URL="$(gcloud run services describe "${BACKEND_SERVICE}" \
   --region "${REGION}" \
   --format "value(status.url)")"
 
+echo "Preparing backend before exposing the frontend."
+echo "Backend URL: ${BACKEND_URL}"
+echo "Bielik URL: ${BIELIK_URL}"
+
+if [ "${RUN_RAG_INGEST}" = "1" ]; then
+  echo "Building RAG index. The frontend URL will be printed only after this succeeds."
+  curl -fsS -X POST "${BACKEND_URL}/api/rag/ingest"
+fi
+
+if [ "${RUN_MODEL_PREWARM}" = "1" ]; then
+  echo "Prewarming ASR and Bielik. The frontend URL will be printed only after this succeeds."
+  curl -fsS -X POST "${BACKEND_URL}/api/debug/prewarm"
+fi
+
+if [ "${RUN_SMOKE_TEST}" = "1" ]; then
+  echo "Running backend smoke test before frontend deployment."
+  python "${REPO_ROOT}/tools/run_demo_smoke.py" \
+    --backend-url "${BACKEND_URL}" \
+    --basic-only
+fi
+
+echo "Backend preparation completed. Deploying frontend."
+
 BACKEND_URL="${BACKEND_URL}" \
 FRONTEND_SERVICE="${FRONTEND_SERVICE}" \
 "${SCRIPT_DIR}/frontend-cloud-run.sh"
@@ -101,20 +124,7 @@ gcloud run services update "${BACKEND_SERVICE}" \
   --region "${REGION}" \
   --update-env-vars "CORS_ORIGINS=${FRONTEND_URL}"
 
+echo "Demo deployment completed successfully."
 echo "Backend URL: ${BACKEND_URL}"
 echo "Bielik URL: ${BIELIK_URL}"
 echo "Frontend URL: ${FRONTEND_URL}"
-
-if [ "${RUN_RAG_INGEST}" = "1" ]; then
-  curl -fsS -X POST "${BACKEND_URL}/api/rag/ingest"
-fi
-
-if [ "${RUN_MODEL_PREWARM}" = "1" ]; then
-  curl -fsS -X POST "${BACKEND_URL}/api/debug/prewarm"
-fi
-
-if [ "${RUN_SMOKE_TEST}" = "1" ]; then
-  python "${REPO_ROOT}/tools/run_demo_smoke.py" \
-    --backend-url "${BACKEND_URL}" \
-    --basic-only
-fi

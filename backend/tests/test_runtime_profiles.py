@@ -18,6 +18,7 @@ def test_local_ollama_profile_parses_without_private_paths() -> None:
     assert settings.rag_backend == "chroma"
     assert settings.calendar_storage_backend == "sqlite"
     assert settings.cloud_storage_mode == "ephemeral"
+    assert settings.embedding_device == "cpu"
 
 
 def test_cloud_run_profile_parses_without_private_paths_or_project_ids() -> None:
@@ -30,8 +31,9 @@ def test_cloud_run_profile_parses_without_private_paths_or_project_ids() -> None
     assert settings.ollama_base_url == "https://your-bielik-service-url"
     assert settings.ollama_auth_mode == "google-id-token"
     assert settings.rag_backend == "chroma"
-    assert settings.asr_device == "cpu"
-    assert settings.asr_compute_type == "int8"
+    assert settings.asr_device == "cuda"
+    assert settings.asr_compute_type == "int8_float16"
+    assert settings.embedding_device == "cpu"
     assert settings.calendar_storage_backend == "sqlite"
     assert settings.cloud_storage_mode == "ephemeral"
     assert settings.rag_index_mode == "local-chroma"

@@ -204,11 +204,11 @@ This script performs the full demo deployment:
 3. Builds and deploys private Bielik/Ollama Cloud Run with NVIDIA L4 GPU.
 4. Grants the backend service account access to the private Bielik service.
 5. Builds and deploys the public FastAPI backend with NVIDIA L4 GPU for ASR.
-6. Builds and deploys the public React frontend.
-7. Reconfigures backend CORS to the real frontend URL.
-8. Runs RAG ingestion.
-9. Runs model prewarm for Bielik and `faster-whisper`.
-10. Runs a basic smoke test.
+6. Runs RAG ingestion.
+7. Runs model prewarm for Bielik and `faster-whisper`.
+8. Runs a basic backend smoke test.
+9. Builds and deploys the public React frontend with the prepared backend URL.
+10. Reconfigures backend CORS to the real frontend URL.
 11. Prints backend, Bielik, and frontend URLs.
 
 The cloud demo uses two GPU-backed Cloud Run services:
@@ -235,6 +235,8 @@ The first run can take a long time because Cloud Build pulls Bielik into the
 model image, RAG ingestion downloads the embedding model, and prewarm downloads
 or loads the ASR model. These steps are expected. If a model cannot be downloaded
 or a service cannot be reached, the script fails instead of using a fake fallback.
+The frontend URL is printed only after RAG ingestion, model prewarm, and the
+backend smoke test have succeeded.
 
 ### 4. Open The Frontend
 

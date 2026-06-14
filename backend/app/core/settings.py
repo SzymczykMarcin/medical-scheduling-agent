@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     ollama_auth_mode: Literal["none", "google-id-token"] = "none"
 
     embedding_model_name: str = "sdadas/mmlw-retrieval-roberta-large"
+    embedding_device: str = "cpu"
     rag_backend: Literal["chroma", "bigquery-vector"] = "chroma"
     chroma_persist_dir: str = str(PROJECT_ROOT / "data" / "chroma")
     chroma_collection_name: str = "medical_scheduling_rules"

@@ -85,8 +85,15 @@ class RagIngestionService:
         _reset_collection(client, self.settings.chroma_collection_name)
         collection = client.get_or_create_collection(name=self.settings.chroma_collection_name)
 
-        logger.info("Loading embedding model=%s for RAG ingestion", self.settings.embedding_model_name)
-        model = SentenceTransformer(self.settings.embedding_model_name)
+        logger.info(
+            "Loading embedding model=%s device=%s for RAG ingestion",
+            self.settings.embedding_model_name,
+            self.settings.embedding_device,
+        )
+        model = SentenceTransformer(
+            self.settings.embedding_model_name,
+            device=self.settings.embedding_device,
+        )
         documents = [chunk.content for chunk in chunks]
         embeddings = model.encode(documents, normalize_embeddings=True).tolist()
         collection.add(
@@ -132,8 +139,15 @@ class RagIngestionService:
         table = bigquery.Table(table_id, schema=schema)
         client.create_table(table, exists_ok=True)
 
-        logger.info("Loading embedding model=%s for BigQuery RAG ingestion", self.settings.embedding_model_name)
-        model = SentenceTransformer(self.settings.embedding_model_name)
+        logger.info(
+            "Loading embedding model=%s device=%s for BigQuery RAG ingestion",
+            self.settings.embedding_model_name,
+            self.settings.embedding_device,
+        )
+        model = SentenceTransformer(
+            self.settings.embedding_model_name,
+            device=self.settings.embedding_device,
+        )
         embeddings = model.encode(
             [chunk.content for chunk in chunks],
             normalize_embeddings=True,

@@ -111,6 +111,7 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert ": \"${BACKEND_GPU_TYPE:=nvidia-l4}\"" in content
     assert ": \"${ASR_DEVICE:=cuda}\"" in content
     assert ": \"${ASR_COMPUTE_TYPE:=int8_float16}\"" in content
+    assert ": \"${EMBEDDING_DEVICE:=cpu}\"" in content
     assert "gcloud artifacts repositories describe" in content
     assert "gcloud artifacts repositories create" in content
     assert "gcloud builds submit" in content
@@ -124,6 +125,7 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert "RUNTIME_PROFILE=cloud-run" in content
     assert "OLLAMA_AUTH_MODE=${OLLAMA_AUTH_MODE}" in content
     assert "ASR_DEVICE=${ASR_DEVICE}" in content
+    assert "EMBEDDING_DEVICE=${EMBEDDING_DEVICE}" in content
     assert "RAG_BACKEND=${RAG_BACKEND}" in content
     assert "CALENDAR_STORAGE_BACKEND=${CALENDAR_STORAGE_BACKEND}" in content
     assert "C:/" not in content
@@ -198,6 +200,13 @@ def test_demo_cloud_run_script_wires_private_model_to_public_backend() -> None:
     assert "/api/rag/ingest" in content
     assert "/api/debug/prewarm" in content
     assert "--basic-only" in content
+    assert "Preparing backend before exposing the frontend." in content
+    assert "Backend preparation completed. Deploying frontend." in content
+    assert "Demo deployment completed successfully." in content
+    assert content.index("/api/rag/ingest") < content.index("frontend-cloud-run.sh")
+    assert content.index("/api/debug/prewarm") < content.index("frontend-cloud-run.sh")
+    assert content.index("--basic-only") < content.index("frontend-cloud-run.sh")
+    assert content.index("Frontend URL:") > content.index("Backend preparation completed.")
 
 
 def test_ci_runs_backend_and_frontend_checks() -> None:
