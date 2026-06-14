@@ -24,10 +24,10 @@ gcloud run deploy "${BIELIK_SERVICE}" \
   --gpu-type nvidia-l4 \
   --memory "${BIELIK_MEMORY}" \
   --timeout 600 \
+  --port 11434 \
   --max-instances "${BIELIK_MAX_INSTANCES}" \
   --no-allow-unauthenticated \
   --no-cpu-throttling \
   --no-gpu-zonal-redundancy \
   --set-env-vars "MODEL=${BIELIK_OLLAMA_MODEL},OLLAMA_NUM_PARALLEL=${BIELIK_CONCURRENCY},OLLAMA_KEEP_ALIVE=-1" \
   --labels "app=medical-scheduling-agent,component=bielik-model"
-

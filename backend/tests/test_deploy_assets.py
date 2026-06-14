@@ -83,6 +83,16 @@ def test_cloud_run_scripts_are_parameterized() -> None:
         assert "C:\\" not in content
 
 
+def test_ollama_cloud_run_services_use_ollama_port() -> None:
+    for relative_path in [
+        "cloud-run/bielik-cloud-run.sh",
+        "cloud-run/embedding-cloud-run.sh",
+    ]:
+        content = (DEPLOY_DIR / relative_path).read_text(encoding="utf-8")
+
+        assert "--port 11434" in content
+
+
 def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     content = (DEPLOY_DIR / "cloud-run" / "backend-cloud-run.sh").read_text(encoding="utf-8")
 

@@ -22,8 +22,8 @@ gcloud run deploy "${EMBEDDING_SERVICE}" \
   --cpu "${EMBEDDING_CPU}" \
   --memory "${EMBEDDING_MEMORY}" \
   --timeout 600 \
+  --port 11434 \
   --max-instances "${EMBEDDING_MAX_INSTANCES}" \
   --no-allow-unauthenticated \
   --set-env-vars "MODEL=${EMBEDDING_OLLAMA_MODEL},OLLAMA_NUM_PARALLEL=${EMBEDDING_CONCURRENCY},OLLAMA_KEEP_ALIVE=-1" \
   --labels "app=medical-scheduling-agent,component=embedding-model"
-
