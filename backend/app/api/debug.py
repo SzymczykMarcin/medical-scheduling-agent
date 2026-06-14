@@ -12,12 +12,14 @@ from app.models.rag import ConversationMessage
 from app.services.debug_analysis import AppointmentDebugAnalysisService
 from app.services.asr import TranscriptionService
 from app.services.bielik import BielikLlmService
+from app.services.embeddings import EmbeddingService
 
 router = APIRouter(prefix="/debug", tags=["debug"])
 logger = logging.getLogger(__name__)
 debug_analysis_service = AppointmentDebugAnalysisService()
 transcription_service = TranscriptionService()
 llm_service = BielikLlmService()
+embedding_service = EmbeddingService()
 
 
 @router.post("/appointment-analysis", response_model=AppointmentDebugResponse)
@@ -39,6 +41,7 @@ def prewarm_demo_models() -> PrewarmResponse:
     """Load demo AI components before the first manual browser test."""
     components = [
         _run_prewarm_component("asr", transcription_service.prewarm_model),
+        _run_prewarm_component("embedding", _prewarm_embedding),
         _run_prewarm_component("bielik", _prewarm_bielik),
     ]
     response = PrewarmResponse(
@@ -62,6 +65,10 @@ def _prewarm_bielik() -> None:
             )
         ]
     )
+
+
+def _prewarm_embedding() -> None:
+    embedding_service.embed_query("Test gotowosci indeksu RAG.")
 
 
 def _run_prewarm_component(name: str, operation) -> PrewarmComponentResult:

@@ -158,7 +158,13 @@ def test_prewarm_endpoint_reports_loaded_components(monkeypatch) -> None:
             calls.append("bielik")
             return "gotowe"
 
+    class FakeEmbeddingService:
+        def embed_query(self, text: str) -> list[float]:
+            calls.append("embedding")
+            return [0.1, 0.2, 0.3]
+
     monkeypatch.setattr(debug, "transcription_service", FakeTranscriptionService())
+    monkeypatch.setattr(debug, "embedding_service", FakeEmbeddingService())
     monkeypatch.setattr(debug, "llm_service", FakeLlmService())
     client = TestClient(app)
 
@@ -167,8 +173,12 @@ def test_prewarm_endpoint_reports_loaded_components(monkeypatch) -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
-    assert [component["name"] for component in body["components"]] == ["asr", "bielik"]
-    assert calls == ["asr", "bielik"]
+    assert [component["name"] for component in body["components"]] == [
+        "asr",
+        "embedding",
+        "bielik",
+    ]
+    assert calls == ["asr", "embedding", "bielik"]
 
 
 def test_prewarm_endpoint_fails_visibly(monkeypatch) -> None:
@@ -180,7 +190,12 @@ def test_prewarm_endpoint_fails_visibly(monkeypatch) -> None:
         def generate(self, messages) -> str:
             return "gotowe"
 
+    class FakeEmbeddingService:
+        def embed_query(self, text: str) -> list[float]:
+            return [0.1, 0.2, 0.3]
+
     monkeypatch.setattr(debug, "transcription_service", FailingTranscriptionService())
+    monkeypatch.setattr(debug, "embedding_service", FakeEmbeddingService())
     monkeypatch.setattr(debug, "llm_service", FakeLlmService())
     client = TestClient(app)
 

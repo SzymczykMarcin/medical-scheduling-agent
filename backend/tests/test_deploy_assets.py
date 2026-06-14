@@ -111,7 +111,14 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert ": \"${BACKEND_GPU_TYPE:=nvidia-l4}\"" in content
     assert ": \"${ASR_DEVICE:=cuda}\"" in content
     assert ": \"${ASR_COMPUTE_TYPE:=int8_float16}\"" in content
+    assert ": \"${RAG_BACKEND:=bigquery-vector}\"" in content
+    assert ": \"${RAG_INDEX_MODE:=managed-vector}\"" in content
+    assert ": \"${EMBEDDING_PROVIDER:=ollama-http}\"" in content
+    assert ": \"${EMBEDDING_BASE_URL:=}\"" in content
+    assert ": \"${EMBEDDING_MODEL_NAME:=embeddinggemma:latest}\"" in content
+    assert ": \"${EMBEDDING_AUTH_MODE:=google-id-token}\"" in content
     assert ": \"${EMBEDDING_DEVICE:=cpu}\"" in content
+    assert "EMBEDDING_BASE_URL is required when RAG_BACKEND=bigquery-vector." in content
     assert "gcloud artifacts repositories describe" in content
     assert "gcloud artifacts repositories create" in content
     assert "gcloud builds submit" in content
@@ -125,6 +132,10 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert "RUNTIME_PROFILE=cloud-run" in content
     assert "OLLAMA_AUTH_MODE=${OLLAMA_AUTH_MODE}" in content
     assert "ASR_DEVICE=${ASR_DEVICE}" in content
+    assert "EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER}" in content
+    assert "EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL}" in content
+    assert "EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME}" in content
+    assert "EMBEDDING_AUTH_MODE=${EMBEDDING_AUTH_MODE}" in content
     assert "EMBEDDING_DEVICE=${EMBEDDING_DEVICE}" in content
     assert "RAG_BACKEND=${RAG_BACKEND}" in content
     assert "CALENDAR_STORAGE_BACKEND=${CALENDAR_STORAGE_BACKEND}" in content
@@ -197,9 +208,15 @@ def test_demo_cloud_run_script_wires_private_model_to_public_backend() -> None:
     assert "gcloud run services delete" in content
     assert "gcloud iam service-accounts create" in content
     assert "bielik-cloud-run.sh" in content
+    assert "embedding-cloud-run.sh" in content
     assert "gcloud run services add-iam-policy-binding" in content
     assert "roles/run.invoker" in content
     assert 'OLLAMA_AUTH_MODE="google-id-token"' in content
+    assert 'EMBEDDING_BASE_URL="${EMBEDDING_URL}"' in content
+    assert 'EMBEDDING_PROVIDER="${EMBEDDING_PROVIDER:-ollama-http}"' in content
+    assert 'RAG_BACKEND="${RAG_BACKEND:-bigquery-vector}"' in content
+    assert 'RAG_INDEX_MODE="${RAG_INDEX_MODE:-managed-vector}"' in content
+    assert 'BIGQUERY_PROJECT_ID="${BIGQUERY_PROJECT_ID:-${PROJECT_ID}}"' in content
     assert 'BACKEND_GPU_ENABLED="${BACKEND_GPU_ENABLED:-true}"' in content
     assert 'BACKEND_GPU_TYPE="${BACKEND_GPU_TYPE:-nvidia-l4}"' in content
     assert 'BACKEND_MIN_INSTANCES="${BACKEND_MIN_INSTANCES:-0}"' in content

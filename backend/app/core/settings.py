@@ -40,8 +40,12 @@ class Settings(BaseSettings):
     ollama_timeout_seconds: float = 120.0
     ollama_auth_mode: Literal["none", "google-id-token"] = "none"
 
+    embedding_provider: Literal["sentence-transformers", "ollama-http"] = "sentence-transformers"
+    embedding_base_url: str | None = None
     embedding_model_name: str = "sdadas/mmlw-retrieval-roberta-large"
     embedding_device: str = "cpu"
+    embedding_timeout_seconds: float = 120.0
+    embedding_auth_mode: Literal["none", "google-id-token"] = "none"
     rag_backend: Literal["chroma", "bigquery-vector"] = "chroma"
     chroma_persist_dir: str = str(PROJECT_ROOT / "data" / "chroma")
     chroma_collection_name: str = "medical_scheduling_rules"
@@ -69,6 +73,19 @@ class Settings(BaseSettings):
             raise ValueError("OLLAMA_BASE_URL is required when LLM_PROVIDER=ollama-http.")
         if self.rag_backend == "bigquery-vector" and not self.bigquery_project_id:
             raise ValueError("BIGQUERY_PROJECT_ID is required when RAG_BACKEND=bigquery-vector.")
+        if (
+            self.runtime_profile == "cloud-run"
+            and self.rag_backend == "bigquery-vector"
+            and self.embedding_provider != "ollama-http"
+        ):
+            raise ValueError(
+                "EMBEDDING_PROVIDER=ollama-http is required when "
+                "RAG_BACKEND=bigquery-vector."
+            )
+        if self.embedding_provider == "ollama-http" and not self.embedding_base_url:
+            raise ValueError(
+                "EMBEDDING_BASE_URL is required when EMBEDDING_PROVIDER=ollama-http."
+            )
         if self.calendar_storage_backend in {"sqlite", "sql"} and not self.effective_database_url:
             raise ValueError("DATABASE_URL or SQLITE_DATABASE_URL is required for SQL calendar storage.")
         if self.calendar_storage_backend == "sql" and not self.database_url:

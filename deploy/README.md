@@ -3,8 +3,10 @@
 This directory contains local and cloud deployment assets for the demo backend and
 model services.
 
-The standard architecture keeps Bielik outside the backend process. The backend
-calls an Ollama-compatible model service over HTTP.
+The standard cloud architecture keeps Bielik and EmbeddingGemma outside the
+backend process. The backend calls private Ollama-compatible model services over
+HTTP, stores RAG vectors in BigQuery, and uses BigQuery Vector Search at query
+time.
 
 The backend can use a Bielik model server when configured with:
 
@@ -89,46 +91,56 @@ export REGION="europe-west1"
 - enables required Google APIs,
 - creates a backend service account when it is missing,
 - deploys private Bielik Cloud Run,
-- grants the backend service account `roles/run.invoker` on Bielik,
+- deploys private EmbeddingGemma Cloud Run,
+- grants the backend service account `roles/run.invoker` on both model services,
+- grants the backend service account BigQuery permissions for the demo vector table,
 - deploys public backend Cloud Run with `OLLAMA_AUTH_MODE=google-id-token`,
+- runs RAG ingestion into BigQuery Vector Search,
+- prewarms ASR, EmbeddingGemma, and Bielik,
 - deploys the React frontend as a public Cloud Run service,
 - rebuilds backend CORS with the real frontend URL,
-- runs RAG ingestion,
-- prewarms ASR and Bielik,
-- prints backend, Bielik, and frontend URLs.
+- prints backend, Bielik, EmbeddingGemma, and frontend URLs.
 
-The first run is intentionally slower: Cloud Build pulls the Bielik model into
-the model service image, RAG ingestion downloads the embedding model, and
-`/api/debug/prewarm` downloads/loads the ASR model. If any of these downloads
-fails, the command should fail visibly.
+The first run is intentionally slower: Cloud Build pulls Bielik and
+EmbeddingGemma into model service images, RAG ingestion builds the BigQuery
+vector table, and `/api/debug/prewarm` downloads/loads the ASR model. If any of
+these steps fails, the command should fail visibly.
 
-Manual deployment is still possible. Deploy the Bielik model service first:
+Manual deployment is still possible. Deploy the Bielik and embedding model
+services first:
 
 ```bash
 export PROJECT_ID="your-project-id"
 export REGION="europe-west1"
 ./deploy/cloud-run/bielik-cloud-run.sh
+./deploy/cloud-run/embedding-cloud-run.sh
 ```
 
-Deploy the backend after you know the Bielik service URL:
+Deploy the backend after you know both service URLs:
 
 ```bash
 export FRONTEND_ORIGIN="https://your-frontend.example.com"
 export OLLAMA_BASE_URL="https://your-bielik-service-url"
+export EMBEDDING_BASE_URL="https://your-embedding-service-url"
+export RAG_BACKEND="bigquery-vector"
+export RAG_INDEX_MODE="managed-vector"
+export BIGQUERY_PROJECT_ID="${PROJECT_ID}"
 ./deploy/cloud-run/backend-cloud-run.sh
 ```
 
 The backend Cloud Run script builds the repository root Dockerfile, pushes the
 image to Artifact Registry, and deploys it as a public demo API. It creates the
-Docker repository when it is missing. By default, cloud ASR uses CPU mode:
+Docker repository when it is missing. By default, the demo backend uses an
+NVIDIA L4 for ASR:
 
 ```env
-ASR_DEVICE=cpu
-ASR_COMPUTE_TYPE=int8
+ASR_DEVICE=cuda
+ASR_COMPUTE_TYPE=int8_float16
 ```
 
-This is slower than GPU transcription, but easier to deploy as a public demo. For
-GPU-backed backend ASR, override those variables and adjust Cloud Run resources.
+The script deploys with `min-instances=0`, so the GPU is not kept warm while the
+demo is idle. The next request after idle can be slow because the container and
+model need to start again.
 
 ### Cloud Smoke Checklist
 
@@ -168,10 +180,10 @@ npm run build
 
 ### Storage Notes
 
-The current Cloud Run profile stores Chroma and SQLite under `/tmp`. That is
-acceptable for a short-lived self-hosted demo, but it is not persistent. A more
-durable demo should replace this with durable storage or managed vector/database
-services.
+The current Cloud Run profile stores RAG vectors in BigQuery Vector Search.
+SQLite appointments still live under `/tmp`, which is acceptable for a
+short-lived self-hosted demo but is not persistent. A more durable demo should
+replace appointment storage with a managed SQL database.
 
 The backend exposes this explicitly through:
 
@@ -193,7 +205,7 @@ CALENDAR_STORAGE_BACKEND=sql
 DATABASE_URL=postgresql+psycopg://...
 ```
 
-For durable managed vector RAG:
+Managed vector RAG is the standard Cloud Run mode:
 
 ```env
 RAG_BACKEND=bigquery-vector
@@ -201,6 +213,10 @@ RAG_INDEX_MODE=managed-vector
 BIGQUERY_PROJECT_ID=your-project-id
 BIGQUERY_DATASET_ID=rag_dataset
 BIGQUERY_TABLE_ID=medical_scheduling_rules
+EMBEDDING_PROVIDER=ollama-http
+EMBEDDING_BASE_URL=https://your-embedding-service-url
+EMBEDDING_MODEL_NAME=embeddinggemma:latest
+EMBEDDING_AUTH_MODE=google-id-token
 ```
 
 See:

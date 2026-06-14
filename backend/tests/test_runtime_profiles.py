@@ -30,13 +30,17 @@ def test_cloud_run_profile_parses_without_private_paths_or_project_ids() -> None
     assert settings.llm_provider == "ollama-http"
     assert settings.ollama_base_url == "https://your-bielik-service-url"
     assert settings.ollama_auth_mode == "google-id-token"
-    assert settings.rag_backend == "chroma"
+    assert settings.rag_backend == "bigquery-vector"
+    assert settings.bigquery_project_id == "your-project-id"
+    assert settings.embedding_provider == "ollama-http"
+    assert settings.embedding_base_url == "https://your-embedding-service-url"
+    assert settings.embedding_auth_mode == "google-id-token"
     assert settings.asr_device == "cuda"
     assert settings.asr_compute_type == "int8_float16"
     assert settings.embedding_device == "cpu"
     assert settings.calendar_storage_backend == "sqlite"
     assert settings.cloud_storage_mode == "ephemeral"
-    assert settings.rag_index_mode == "local-chroma"
+    assert settings.rag_index_mode == "managed-vector"
     assert "C:/" not in content
     assert "C:\\" not in content
     assert "/Users/" not in content

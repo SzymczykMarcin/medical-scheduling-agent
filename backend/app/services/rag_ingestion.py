@@ -6,6 +6,7 @@ from typing import Any
 from app.core.settings import Settings, get_settings
 from app.models.ingestion import RagIngestionResponse
 from app.services.exceptions import RagAnalysisError, RagDataNotReadyError
+from app.services.embeddings import EmbeddingService
 from app.services.medical_rules import MedicalRuleSourceLoader, SourceDocument
 
 logger = logging.getLogger(__name__)
@@ -116,10 +117,9 @@ class RagIngestionService:
             )
         try:
             from google.cloud import bigquery
-            from sentence_transformers import SentenceTransformer
         except ImportError as exc:
             raise RagAnalysisError(
-                "google-cloud-bigquery and sentence-transformers are required for BigQuery RAG ingestion."
+                "google-cloud-bigquery is required for BigQuery RAG ingestion."
             ) from exc
 
         table_id = (
@@ -136,22 +136,17 @@ class RagIngestionService:
             bigquery.SchemaField("heading", "STRING", mode="NULLABLE"),
             bigquery.SchemaField("embedding", "FLOAT64", mode="REPEATED"),
         ]
+        client.delete_table(table_id, not_found_ok=True)
         table = bigquery.Table(table_id, schema=schema)
         client.create_table(table, exists_ok=True)
 
         logger.info(
-            "Loading embedding model=%s device=%s for BigQuery RAG ingestion",
+            "Generating embeddings for BigQuery RAG ingestion provider=%s model=%s chunks=%s",
+            self.settings.embedding_provider,
             self.settings.embedding_model_name,
-            self.settings.embedding_device,
+            len(chunks),
         )
-        model = SentenceTransformer(
-            self.settings.embedding_model_name,
-            device=self.settings.embedding_device,
-        )
-        embeddings = model.encode(
-            [chunk.content for chunk in chunks],
-            normalize_embeddings=True,
-        ).tolist()
+        embeddings = EmbeddingService(self.settings).embed([chunk.content for chunk in chunks])
         rows = [
             {
                 "id": chunk.id,

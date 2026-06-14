@@ -39,6 +39,15 @@ class FakeLlm:
         return self.response
 
 
+def bigquery_settings() -> Settings:
+    return Settings(
+        rag_backend="bigquery-vector",
+        bigquery_project_id="demo-project",
+        embedding_provider="ollama-http",
+        embedding_base_url="https://embedding.example.test",
+    )
+
+
 def test_rag_analysis_returns_structured_intent() -> None:
     retriever = FakeRetriever()
     llm = FakeLlm(
@@ -158,9 +167,7 @@ def test_retriever_factory_selects_chroma_backend(tmp_path) -> None:
 
 
 def test_retriever_factory_selects_bigquery_vector_backend() -> None:
-    retriever = create_knowledge_base_retriever(
-        Settings(rag_backend="bigquery-vector", bigquery_project_id="demo-project")
-    )
+    retriever = create_knowledge_base_retriever(bigquery_settings())
 
     assert isinstance(retriever, BigQueryVectorKnowledgeBaseRetriever)
 

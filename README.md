@@ -17,7 +17,9 @@ does not send real SMS messages, and does not integrate with real clinic systems
 - FastAPI backend.
 - `faster-whisper` speech-to-text for Polish audio.
 - Bielik through an Ollama-compatible HTTP API.
-- Chroma vector RAG over medical scheduling rules from `data/rag`.
+- Vector RAG over medical scheduling rules from `data/rag`.
+  Local development uses Chroma; Cloud Run uses EmbeddingGemma plus BigQuery
+  Vector Search.
 - Deterministic scheduler that prevents silent calendar conflicts.
 - SQLite demo calendar storage.
 - Google Cloud Run deployment scripts for frontend, backend, and GPU model
@@ -202,25 +204,30 @@ This script performs the full demo deployment:
 1. Enables required Google APIs.
 2. Creates the backend service account if missing.
 3. Builds and deploys private Bielik/Ollama Cloud Run with NVIDIA L4 GPU.
-4. Grants the backend service account access to the private Bielik service.
-5. Builds and deploys the public FastAPI backend with NVIDIA L4 GPU for ASR.
-6. Runs RAG ingestion.
-7. Runs model prewarm for Bielik and `faster-whisper`.
-8. Runs a basic backend smoke test.
-9. Builds and deploys the public React frontend with the prepared backend URL.
-10. Reconfigures backend CORS to the real frontend URL.
-11. Prints backend, Bielik, and frontend URLs.
+4. Builds and deploys private EmbeddingGemma/Ollama Cloud Run for RAG vectors.
+5. Grants the backend service account access to both private model services.
+6. Grants the backend service account BigQuery permissions for the demo vector
+   table.
+7. Builds and deploys the public FastAPI backend with NVIDIA L4 GPU for ASR.
+8. Runs RAG ingestion into BigQuery Vector Search.
+9. Runs model prewarm for EmbeddingGemma, Bielik, and `faster-whisper`.
+10. Runs a basic backend smoke test.
+11. Builds and deploys the public React frontend with the prepared backend URL.
+12. Reconfigures backend CORS to the real frontend URL.
+13. Prints backend, Bielik, EmbeddingGemma, and frontend URLs.
 
-The cloud demo uses two GPU-backed Cloud Run services:
+The cloud demo uses three backend-facing Cloud Run services:
 
 - `medical-scheduling-bielik`: private Bielik/Ollama service on NVIDIA L4.
 - `medical-scheduling-backend`: public FastAPI backend on NVIDIA L4, used by
   `faster-whisper` ASR.
+- `medical-scheduling-embedding`: private EmbeddingGemma/Ollama service used to
+  create query and document vectors for BigQuery Vector Search.
 
-Both services are deployed with `min-instances=0` and `max-instances=1`. This
-keeps the demo from holding an always-on GPU while idle, but the first request
-after idle can be slow because Cloud Run must start the container and load the
-models again.
+The model and backend services are deployed with `min-instances=0` and
+`max-instances=1`. This keeps the demo from holding always-on compute while
+idle, but the first request after idle can be slow because Cloud Run must start
+the containers and load the models again.
 
 If you are redeploying into the same project and Cloud Run reports
 `MemAllocPerProjectRegion` quota during deployment, run a clean service
@@ -231,12 +238,12 @@ them; it does not delete your Google Cloud project or Artifact Registry images:
 REPLACE_EXISTING_SERVICES=1 ./deploy/cloud-run/deploy-demo.sh
 ```
 
-The first run can take a long time because Cloud Build pulls Bielik into the
-model image, RAG ingestion downloads the embedding model, and prewarm downloads
-or loads the ASR model. These steps are expected. If a model cannot be downloaded
-or a service cannot be reached, the script fails instead of using a fake fallback.
-The frontend URL is printed only after RAG ingestion, model prewarm, and the
-backend smoke test have succeeded.
+The first run can take a long time because Cloud Build pulls Bielik and
+EmbeddingGemma into model service images, RAG ingestion builds the BigQuery
+vector table, and prewarm downloads or loads the ASR model. These steps are
+expected. If a model cannot be downloaded or a service cannot be reached, the
+script fails instead of using a fake fallback. The frontend URL is printed only
+after RAG ingestion, model prewarm, and the backend smoke test have succeeded.
 
 ### 4. Open The Frontend
 
@@ -286,6 +293,10 @@ Cloud:
 ```bash
 curl -fsS -X POST "https://your-backend-url/api/rag/ingest"
 ```
+
+In Cloud Run, this rebuilds the BigQuery vector table by calling the private
+EmbeddingGemma service for document embeddings. It does not create or use a
+Chroma database in `/tmp`.
 
 The scheduler supports visit durations normalized to `30`, `60`, `90`, and
 `120` minutes.

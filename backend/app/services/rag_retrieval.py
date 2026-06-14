@@ -4,6 +4,7 @@ from typing import Any, Protocol
 
 from app.core.settings import Settings, get_settings
 from app.models.rag import RetrievedPassage
+from app.services.embeddings import EmbeddingService
 from app.services.exceptions import RagAnalysisError, RagDataNotReadyError
 
 logger = logging.getLogger(__name__)
@@ -161,11 +162,13 @@ class BigQueryVectorKnowledgeBaseRetriever:
         self,
         settings: Settings | None = None,
         bigquery_client: Any | None = None,
+        embedding_service: EmbeddingService | None = None,
         embedding_model: Any | None = None,
     ) -> None:
         self.settings = settings or get_settings()
         self._bigquery_client = bigquery_client
-        self._embedding_model = embedding_model
+        self._embedding_service = embedding_service
+        self._legacy_embedding_model = embedding_model
 
     def retrieve(self, query: str, limit: int | None = None) -> list[RetrievedPassage]:
         """Return passages from a cloud vector store when configured."""
@@ -183,10 +186,7 @@ class BigQueryVectorKnowledgeBaseRetriever:
                 "BIGQUERY_PROJECT_ID is required when RAG_BACKEND=bigquery-vector."
             )
 
-        query_embedding = self._get_embedding_model().encode(
-            query,
-            normalize_embeddings=True,
-        ).tolist()
+        query_embedding = self._embed_query(query)
         rows = self._run_vector_search(query_embedding=query_embedding, limit=selected_limit)
         passages = [_map_bigquery_row(row) for row in rows]
         logger.info(
@@ -198,23 +198,16 @@ class BigQueryVectorKnowledgeBaseRetriever:
         )
         return passages
 
-    def _get_embedding_model(self) -> Any:
-        if self._embedding_model is None:
-            try:
-                from sentence_transformers import SentenceTransformer
-            except ImportError as exc:
-                raise RagAnalysisError("sentence-transformers is not installed.") from exc
+    def _get_embedding_service(self) -> EmbeddingService:
+        if self._embedding_service is None:
+            self._embedding_service = EmbeddingService(self.settings)
+        return self._embedding_service
 
-            logger.info(
-                "Loading embedding model=%s device=%s",
-                self.settings.embedding_model_name,
-                self.settings.embedding_device,
-            )
-            self._embedding_model = SentenceTransformer(
-                self.settings.embedding_model_name,
-                device=self.settings.embedding_device,
-            )
-        return self._embedding_model
+    def _embed_query(self, query: str) -> list[float]:
+        if self._legacy_embedding_model is not None:
+            vector = self._legacy_embedding_model.encode(query, normalize_embeddings=True)
+            return vector.tolist()
+        return self._get_embedding_service().embed_query(query)
 
     def _get_bigquery_client(self) -> Any:
         if self._bigquery_client is None:

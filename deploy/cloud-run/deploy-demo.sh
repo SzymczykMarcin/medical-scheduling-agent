@@ -5,6 +5,7 @@ set -euo pipefail
 : "${REGION:?Set REGION, for example europe-west1.}"
 
 : "${BIELIK_SERVICE:=medical-scheduling-bielik}"
+: "${EMBEDDING_SERVICE:=medical-scheduling-embedding}"
 : "${BACKEND_SERVICE:=medical-scheduling-backend}"
 : "${FRONTEND_SERVICE:=medical-scheduling-frontend}"
 : "${BACKEND_SERVICE_ACCOUNT:=medical-scheduling-backend}"
@@ -40,11 +41,12 @@ gcloud services enable \
   run.googleapis.com \
   cloudbuild.googleapis.com \
   artifactregistry.googleapis.com \
-  iam.googleapis.com
+  iam.googleapis.com \
+  bigquery.googleapis.com
 
 if [ "${REPLACE_EXISTING_SERVICES}" = "1" ]; then
   echo "Replacing existing Cloud Run demo services before deploy."
-  for service in "${FRONTEND_SERVICE}" "${BACKEND_SERVICE}" "${BIELIK_SERVICE}"; do
+  for service in "${FRONTEND_SERVICE}" "${BACKEND_SERVICE}" "${BIELIK_SERVICE}" "${EMBEDDING_SERVICE}"; do
     if gcloud run services describe "${service}" --region "${REGION}" >/dev/null 2>&1; then
       gcloud run services delete "${service}" --region "${REGION}" --quiet
     fi
@@ -56,9 +58,23 @@ if ! gcloud iam service-accounts describe "${BACKEND_SERVICE_ACCOUNT_EMAIL}" >/d
     --display-name "Medical Scheduling Backend"
 fi
 
+gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+  --member "serviceAccount:${BACKEND_SERVICE_ACCOUNT_EMAIL}" \
+  --role "roles/bigquery.jobUser" \
+  --quiet >/dev/null
+
+gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+  --member "serviceAccount:${BACKEND_SERVICE_ACCOUNT_EMAIL}" \
+  --role "roles/bigquery.dataEditor" \
+  --quiet >/dev/null
+
 "${SCRIPT_DIR}/bielik-cloud-run.sh"
+"${SCRIPT_DIR}/embedding-cloud-run.sh"
 
 BIELIK_URL="$(gcloud run services describe "${BIELIK_SERVICE}" \
+  --region "${REGION}" \
+  --format "value(status.url)")"
+EMBEDDING_URL="$(gcloud run services describe "${EMBEDDING_SERVICE}" \
   --region "${REGION}" \
   --format "value(status.url)")"
 
@@ -67,10 +83,22 @@ gcloud run services add-iam-policy-binding "${BIELIK_SERVICE}" \
   --member "serviceAccount:${BACKEND_SERVICE_ACCOUNT_EMAIL}" \
   --role "roles/run.invoker"
 
+gcloud run services add-iam-policy-binding "${EMBEDDING_SERVICE}" \
+  --region "${REGION}" \
+  --member "serviceAccount:${BACKEND_SERVICE_ACCOUNT_EMAIL}" \
+  --role "roles/run.invoker"
+
 echo "Deploying GPU demo profile: Bielik on L4, backend ASR on L4, min instances 0, max instances 1."
 
 OLLAMA_BASE_URL="${BIELIK_URL}" \
 OLLAMA_AUTH_MODE="google-id-token" \
+EMBEDDING_BASE_URL="${EMBEDDING_URL}" \
+EMBEDDING_PROVIDER="${EMBEDDING_PROVIDER:-ollama-http}" \
+EMBEDDING_MODEL_NAME="${EMBEDDING_MODEL_NAME:-embeddinggemma:latest}" \
+EMBEDDING_AUTH_MODE="${EMBEDDING_AUTH_MODE:-google-id-token}" \
+RAG_BACKEND="${RAG_BACKEND:-bigquery-vector}" \
+RAG_INDEX_MODE="${RAG_INDEX_MODE:-managed-vector}" \
+BIGQUERY_PROJECT_ID="${BIGQUERY_PROJECT_ID:-${PROJECT_ID}}" \
 BACKEND_SERVICE="${BACKEND_SERVICE}" \
 BACKEND_SERVICE_ACCOUNT_EMAIL="${BACKEND_SERVICE_ACCOUNT_EMAIL}" \
 FRONTEND_ORIGIN="${FRONTEND_ORIGIN}" \
@@ -92,6 +120,7 @@ BACKEND_URL="$(gcloud run services describe "${BACKEND_SERVICE}" \
 echo "Preparing backend before exposing the frontend."
 echo "Backend URL: ${BACKEND_URL}"
 echo "Bielik URL: ${BIELIK_URL}"
+echo "Embedding URL: ${EMBEDDING_URL}"
 
 if [ "${RUN_RAG_INGEST}" = "1" ]; then
   echo "Building RAG index. The frontend URL will be printed only after this succeeds."
@@ -127,4 +156,5 @@ gcloud run services update "${BACKEND_SERVICE}" \
 echo "Demo deployment completed successfully."
 echo "Backend URL: ${BACKEND_URL}"
 echo "Bielik URL: ${BIELIK_URL}"
+echo "Embedding URL: ${EMBEDDING_URL}"
 echo "Frontend URL: ${FRONTEND_URL}"
