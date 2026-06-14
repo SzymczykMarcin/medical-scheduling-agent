@@ -12,6 +12,7 @@ set -euo pipefail
 : "${RUN_RAG_INGEST:=1}"
 : "${RUN_MODEL_PREWARM:=1}"
 : "${RUN_SMOKE_TEST:=1}"
+: "${REPLACE_EXISTING_SERVICES:=0}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -40,6 +41,15 @@ gcloud services enable \
   cloudbuild.googleapis.com \
   artifactregistry.googleapis.com \
   iam.googleapis.com
+
+if [ "${REPLACE_EXISTING_SERVICES}" = "1" ]; then
+  echo "Replacing existing Cloud Run demo services before deploy."
+  for service in "${FRONTEND_SERVICE}" "${BACKEND_SERVICE}" "${BIELIK_SERVICE}"; do
+    if gcloud run services describe "${service}" --region "${REGION}" >/dev/null 2>&1; then
+      gcloud run services delete "${service}" --region "${REGION}" --quiet
+    fi
+  done
+fi
 
 if ! gcloud iam service-accounts describe "${BACKEND_SERVICE_ACCOUNT_EMAIL}" >/dev/null 2>&1; then
   gcloud iam service-accounts create "${BACKEND_SERVICE_ACCOUNT}" \

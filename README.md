@@ -222,6 +222,15 @@ keeps the demo from holding an always-on GPU while idle, but the first request
 after idle can be slow because Cloud Run must start the container and load the
 models again.
 
+If you are redeploying into the same project and Cloud Run reports
+`MemAllocPerProjectRegion` quota during deployment, run a clean service
+replacement. This deletes only the demo Cloud Run services and then recreates
+them; it does not delete your Google Cloud project or Artifact Registry images:
+
+```bash
+REPLACE_EXISTING_SERVICES=1 ./deploy/cloud-run/deploy-demo.sh
+```
+
 The first run can take a long time because Cloud Build pulls Bielik into the
 model image, RAG ingestion downloads the embedding model, and prewarm downloads
 or loads the ASR model. These steps are expected. If a model cannot be downloaded

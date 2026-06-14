@@ -177,6 +177,9 @@ def test_demo_cloud_run_script_wires_private_model_to_public_backend() -> None:
     assert "gcloud projects describe" in content
     assert "gcloud projects list --format='table(projectId,name,projectNumber)'" in content
     assert "gcloud services enable" in content
+    assert ": \"${REPLACE_EXISTING_SERVICES:=0}\"" in content
+    assert "Replacing existing Cloud Run demo services before deploy." in content
+    assert "gcloud run services delete" in content
     assert "gcloud iam service-accounts create" in content
     assert "bielik-cloud-run.sh" in content
     assert "gcloud run services add-iam-policy-binding" in content
