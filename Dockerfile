@@ -5,6 +5,8 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_NO_CACHE_DIR=1
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
+ENV NVIDIA_SITE_PACKAGES=/opt/venv/lib/python3.12/site-packages/nvidia
+ENV LD_LIBRARY_PATH="${NVIDIA_SITE_PACKAGES}/cublas/lib:${NVIDIA_SITE_PACKAGES}/cuda_runtime/lib:${NVIDIA_SITE_PACKAGES}/cudnn/lib:${LD_LIBRARY_PATH}"
 
 WORKDIR /app
 

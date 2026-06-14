@@ -1,6 +1,7 @@
 import logging
 import os
 import tempfile
+import wave
 from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any, Protocol
@@ -69,8 +70,9 @@ class TranscriptionService:
         return transcript
 
     def prewarm_model(self) -> None:
-        """Load the ASR model so the first real recording does not download it."""
+        """Load the ASR model and run a tiny decode to verify runtime libraries."""
         self._get_model()
+        self._verify_runtime_decode()
 
     def _transcribe_file(self, audio_path: str) -> str:
         model = self._get_model()
@@ -113,6 +115,30 @@ class TranscriptionService:
 
         return self._model
 
+    def _verify_runtime_decode(self) -> None:
+        """Run a short silent WAV through faster-whisper to catch missing CUDA libraries."""
+        audio_path: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as audio_file:
+                audio_path = audio_file.name
+            _write_silent_wav(Path(audio_path))
+            segments, _info = self._get_model().transcribe(
+                audio_path,
+                language="pl",
+                beam_size=1,
+                vad_filter=False,
+            )
+            list(segments)
+        except Exception as exc:
+            logger.exception("ASR runtime verification failed.")
+            raise TranscriptionError("ASR runtime verification failed.") from exc
+        finally:
+            if audio_path:
+                try:
+                    os.unlink(audio_path)
+                except OSError:
+                    logger.warning("Could not remove temporary ASR verification file: %s", audio_path)
+
     def _validate_audio_payload(self, filename: str, audio: bytes) -> None:
         if not audio:
             raise AudioValidationError("Uploaded audio is empty.")
@@ -148,3 +174,12 @@ def _safe_audio_suffix(filename: str) -> str:
     if suffix in {".webm", ".wav", ".mp3", ".m4a", ".mp4", ".ogg"}:
         return suffix
     return ".webm"
+
+
+def _write_silent_wav(path: Path, sample_rate: int = 16000, duration_seconds: float = 0.25) -> None:
+    frame_count = int(sample_rate * duration_seconds)
+    with wave.open(str(path), "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(b"\x00\x00" * frame_count)

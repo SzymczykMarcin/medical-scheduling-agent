@@ -138,6 +138,11 @@ def test_backend_dockerfile_contains_cloud_run_entrypoint() -> None:
     assert "FROM python:3.12-slim" in content
     assert "ENV VIRTUAL_ENV=/opt/venv" in content
     assert 'ENV PATH="/opt/venv/bin:${PATH}"' in content
+    assert "ENV NVIDIA_SITE_PACKAGES=/opt/venv/lib/python3.12/site-packages/nvidia" in content
+    assert "LD_LIBRARY_PATH" in content
+    assert "${NVIDIA_SITE_PACKAGES}/cublas/lib" in content
+    assert "${NVIDIA_SITE_PACKAGES}/cuda_runtime/lib" in content
+    assert "${NVIDIA_SITE_PACKAGES}/cudnn/lib" in content
     assert 'python -m venv "${VIRTUAL_ENV}"' in content
     assert "COPY backend/app" in content
     assert "COPY data/rag" in content
@@ -146,6 +151,14 @@ def test_backend_dockerfile_contains_cloud_run_entrypoint() -> None:
     assert "chown -R app:app /app /tmp/medical-scheduling-agent" in content
     assert "USER app" in content
     assert "uvicorn app.main:app" in content
+
+
+def test_backend_cloud_extra_installs_cuda_12_runtime_libraries() -> None:
+    content = (REPO_ROOT / "backend" / "pyproject.toml").read_text(encoding="utf-8")
+
+    assert "nvidia-cublas-cu12==12.6.4.1" in content
+    assert "nvidia-cuda-runtime-cu12==12.6.77" in content
+    assert "nvidia-cudnn-cu12==9.5.1.17" in content
 
 
 def test_frontend_cloud_run_assets_build_static_react_app() -> None:

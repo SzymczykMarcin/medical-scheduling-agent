@@ -70,3 +70,24 @@ def test_transcribe_loads_model_once() -> None:
     service.transcribe(filename="second.webm", audio=b"second")
 
     assert factory_calls == 1
+
+
+def test_prewarm_model_runs_runtime_decode() -> None:
+    fake_model = FakeWhisperModel()
+    factory_calls = 0
+
+    def model_factory(_settings: Settings) -> FakeWhisperModel:
+        nonlocal factory_calls
+        factory_calls += 1
+        return fake_model
+
+    service = TranscriptionService(
+        settings=Settings(demo_mode=False),
+        model_factory=model_factory,
+    )
+
+    service.prewarm_model()
+
+    assert factory_calls == 1
+    assert len(fake_model.calls) == 1
+    assert fake_model.calls[0].endswith(".wav")
