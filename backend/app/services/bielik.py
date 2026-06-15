@@ -2,6 +2,7 @@ import logging
 import threading
 import json
 import subprocess
+import time
 from collections.abc import Callable
 from typing import Any, Protocol
 from urllib.error import HTTPError, URLError
@@ -12,6 +13,9 @@ from app.models.rag import ConversationMessage
 from app.services.exceptions import LlmGenerationError
 
 logger = logging.getLogger(__name__)
+TRANSIENT_HTTP_STATUS_CODES = {429, 502, 503, 504}
+OLLAMA_HTTP_MAX_ATTEMPTS = 3
+OLLAMA_HTTP_RETRY_DELAYS_SECONDS = (2.0, 5.0)
 
 
 JsonPost = Callable[[str, dict[str, Any], float, dict[str, str] | None], dict[str, Any]]
@@ -169,28 +173,7 @@ def post_json(
     headers: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """POST JSON to an HTTP endpoint and return the decoded JSON object."""
-    request_headers = {"Content-Type": "application/json"}
-    if headers:
-        request_headers.update(headers)
-    request = Request(
-        url=url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers=request_headers,
-        method="POST",
-    )
-    try:
-        with urlopen(request, timeout=timeout_seconds) as response:
-            body = response.read().decode("utf-8")
-    except HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        logger.error("Ollama HTTP error status=%s body=%s", exc.code, detail[:500])
-        raise LlmGenerationError(f"Ollama HTTP request failed with status {exc.code}.") from exc
-    except URLError as exc:
-        logger.error("Ollama HTTP connection failed url=%s reason=%s", url, exc.reason)
-        raise LlmGenerationError("Could not connect to Ollama HTTP server.") from exc
-    except TimeoutError as exc:
-        logger.error("Ollama HTTP request timed out url=%s timeout=%s", url, timeout_seconds)
-        raise LlmGenerationError("Ollama HTTP request timed out.") from exc
+    body = _post_json_with_retries(url, payload, timeout_seconds, headers)
 
     try:
         decoded = json.loads(body)
@@ -201,6 +184,75 @@ def post_json(
     if not isinstance(decoded, dict):
         raise LlmGenerationError("Ollama returned an unexpected JSON root.")
     return decoded
+
+
+def _post_json_with_retries(
+    url: str,
+    payload: dict[str, Any],
+    timeout_seconds: float,
+    headers: dict[str, str] | None,
+) -> str:
+    request_headers = {"Content-Type": "application/json"}
+    if headers:
+        request_headers.update(headers)
+
+    last_error: Exception | None = None
+    for attempt in range(1, OLLAMA_HTTP_MAX_ATTEMPTS + 1):
+        request = Request(
+            url=url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers=request_headers,
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=timeout_seconds) as response:
+                return response.read().decode("utf-8")
+        except HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            last_error = exc
+            logger.error(
+                "Ollama HTTP error status=%s attempt=%s/%s body=%s",
+                exc.code,
+                attempt,
+                OLLAMA_HTTP_MAX_ATTEMPTS,
+                detail[:500],
+            )
+            if exc.code not in TRANSIENT_HTTP_STATUS_CODES or attempt == OLLAMA_HTTP_MAX_ATTEMPTS:
+                raise LlmGenerationError(
+                    f"Ollama HTTP request failed with status {exc.code}."
+                ) from exc
+        except URLError as exc:
+            last_error = exc
+            logger.error(
+                "Ollama HTTP connection failed url=%s attempt=%s/%s reason=%s",
+                url,
+                attempt,
+                OLLAMA_HTTP_MAX_ATTEMPTS,
+                exc.reason,
+            )
+            if attempt == OLLAMA_HTTP_MAX_ATTEMPTS:
+                raise LlmGenerationError("Could not connect to Ollama HTTP server.") from exc
+        except TimeoutError as exc:
+            last_error = exc
+            logger.error(
+                "Ollama HTTP request timed out url=%s timeout=%s attempt=%s/%s",
+                url,
+                timeout_seconds,
+                attempt,
+                OLLAMA_HTTP_MAX_ATTEMPTS,
+            )
+            if attempt == OLLAMA_HTTP_MAX_ATTEMPTS:
+                raise LlmGenerationError("Ollama HTTP request timed out.") from exc
+
+        _sleep_before_retry(attempt, url)
+
+    raise LlmGenerationError("Ollama HTTP request failed after retries.") from last_error
+
+
+def _sleep_before_retry(attempt: int, url: str) -> None:
+    delay = OLLAMA_HTTP_RETRY_DELAYS_SECONDS[min(attempt - 1, len(OLLAMA_HTTP_RETRY_DELAYS_SECONDS) - 1)]
+    logger.info("Retrying Ollama HTTP request after %.1fs url=%s", delay, url)
+    time.sleep(delay)
 
 
 def _extract_ollama_text(result: dict[str, Any]) -> str:

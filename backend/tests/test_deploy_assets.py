@@ -111,12 +111,14 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert ": \"${BACKEND_GPU_TYPE:=nvidia-l4}\"" in content
     assert ": \"${ASR_DEVICE:=cuda}\"" in content
     assert ": \"${ASR_COMPUTE_TYPE:=int8_float16}\"" in content
+    assert ": \"${OLLAMA_TIMEOUT_SECONDS:=600}\"" in content
     assert ": \"${RAG_BACKEND:=bigquery-vector}\"" in content
     assert ": \"${RAG_INDEX_MODE:=managed-vector}\"" in content
     assert ": \"${EMBEDDING_PROVIDER:=ollama-http}\"" in content
     assert ": \"${EMBEDDING_BASE_URL:=}\"" in content
     assert ": \"${EMBEDDING_MODEL_NAME:=embeddinggemma:latest}\"" in content
     assert ": \"${EMBEDDING_AUTH_MODE:=google-id-token}\"" in content
+    assert ": \"${EMBEDDING_TIMEOUT_SECONDS:=600}\"" in content
     assert ": \"${EMBEDDING_DEVICE:=cpu}\"" in content
     assert "EMBEDDING_BASE_URL is required when RAG_BACKEND=bigquery-vector." in content
     assert "gcloud artifacts repositories describe" in content
@@ -131,11 +133,13 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert '--min-instances "${BACKEND_MIN_INSTANCES}"' in content
     assert "RUNTIME_PROFILE=cloud-run" in content
     assert "OLLAMA_AUTH_MODE=${OLLAMA_AUTH_MODE}" in content
+    assert "OLLAMA_TIMEOUT_SECONDS=${OLLAMA_TIMEOUT_SECONDS}" in content
     assert "ASR_DEVICE=${ASR_DEVICE}" in content
     assert "EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER}" in content
     assert "EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL}" in content
     assert "EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME}" in content
     assert "EMBEDDING_AUTH_MODE=${EMBEDDING_AUTH_MODE}" in content
+    assert "EMBEDDING_TIMEOUT_SECONDS=${EMBEDDING_TIMEOUT_SECONDS}" in content
     assert "EMBEDDING_DEVICE=${EMBEDDING_DEVICE}" in content
     assert "RAG_BACKEND=${RAG_BACKEND}" in content
     assert "CALENDAR_STORAGE_BACKEND=${CALENDAR_STORAGE_BACKEND}" in content
@@ -212,8 +216,10 @@ def test_demo_cloud_run_script_wires_private_model_to_public_backend() -> None:
     assert "gcloud run services add-iam-policy-binding" in content
     assert "roles/run.invoker" in content
     assert 'OLLAMA_AUTH_MODE="google-id-token"' in content
+    assert 'OLLAMA_TIMEOUT_SECONDS="${OLLAMA_TIMEOUT_SECONDS:-600}"' in content
     assert 'EMBEDDING_BASE_URL="${EMBEDDING_URL}"' in content
     assert 'EMBEDDING_PROVIDER="${EMBEDDING_PROVIDER:-ollama-http}"' in content
+    assert 'EMBEDDING_TIMEOUT_SECONDS="${EMBEDDING_TIMEOUT_SECONDS:-600}"' in content
     assert 'RAG_BACKEND="${RAG_BACKEND:-bigquery-vector}"' in content
     assert 'RAG_INDEX_MODE="${RAG_INDEX_MODE:-managed-vector}"' in content
     assert 'BIGQUERY_PROJECT_ID="${BIGQUERY_PROJECT_ID:-${PROJECT_ID}}"' in content

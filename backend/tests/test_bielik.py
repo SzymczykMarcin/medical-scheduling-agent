@@ -1,12 +1,16 @@
 import pytest
+from io import BytesIO
+from urllib.error import HTTPError
 
 from app.core.settings import Settings
 from app.models.rag import ConversationMessage
+from app.services import bielik
 from app.services.bielik import (
     BielikLlmService,
     OllamaHttpBielikProvider,
     create_bielik_provider,
     fetch_google_id_token,
+    post_json,
 )
 from app.services.exceptions import LlmGenerationError
 
@@ -124,6 +128,49 @@ def test_ollama_provider_preserves_controlled_generation_errors() -> None:
 
     with pytest.raises(LlmGenerationError, match="timed out"):
         service.generate([ConversationMessage(role="user", content="Hello")])
+
+
+def test_post_json_retries_transient_ollama_http_errors(monkeypatch) -> None:
+    attempts: list[str] = []
+    sleeps: list[float] = []
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self) -> bytes:
+            return b'{"message": {"content": "ok"}}'
+
+    def fake_urlopen(request, timeout):
+        attempts.append(request.full_url)
+        if len(attempts) == 1:
+            raise HTTPError(
+                url=request.full_url,
+                code=503,
+                msg="Service Unavailable",
+                hdrs=None,
+                fp=BytesIO(b"starting"),
+            )
+        return FakeResponse()
+
+    monkeypatch.setattr(bielik, "urlopen", fake_urlopen)
+    monkeypatch.setattr(bielik.time, "sleep", lambda delay: sleeps.append(delay))
+
+    response = post_json(
+        "https://bielik.example.test/api/chat",
+        {"model": "bielik:test"},
+        600,
+    )
+
+    assert response == {"message": {"content": "ok"}}
+    assert attempts == [
+        "https://bielik.example.test/api/chat",
+        "https://bielik.example.test/api/chat",
+    ]
+    assert sleeps == [2.0]
 
 
 def test_google_id_token_reports_missing_dependency(monkeypatch) -> None:
