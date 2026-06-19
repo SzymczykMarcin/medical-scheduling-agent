@@ -84,6 +84,19 @@ def test_cloud_run_scripts_are_parameterized() -> None:
         assert "C:\\" not in content
 
 
+def test_cloud_run_demo_defaults_fit_small_quota_projects() -> None:
+    bielik = (DEPLOY_DIR / "cloud-run" / "bielik-cloud-run.sh").read_text(encoding="utf-8")
+    backend = (DEPLOY_DIR / "cloud-run" / "backend-cloud-run.sh").read_text(encoding="utf-8")
+    embedding = (DEPLOY_DIR / "cloud-run" / "embedding-cloud-run.sh").read_text(encoding="utf-8")
+    frontend = (DEPLOY_DIR / "cloud-run" / "frontend-cloud-run.sh").read_text(encoding="utf-8")
+
+    assert ': "${BIELIK_MEMORY:=10Gi}"' in bielik
+    assert ': "${BACKEND_MEMORY:=8Gi}"' in backend
+    assert ': "${EMBEDDING_MEMORY:=4Gi}"' in embedding
+    assert ': "${FRONTEND_MEMORY:=128Mi}"' in frontend
+    assert ': "${FRONTEND_MAX_INSTANCES:=1}"' in frontend
+
+
 def test_ollama_cloud_run_services_use_ollama_port() -> None:
     for relative_path in [
         "cloud-run/bielik-cloud-run.sh",
@@ -102,7 +115,7 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert ": \"${FRONTEND_ORIGIN:?" in content
     assert ": \"${OLLAMA_BASE_URL:?" in content
     assert "BACKEND_SERVICE_ACCOUNT_EMAIL" in content
-    assert ": \"${BACKEND_MEMORY:=16Gi}\"" in content
+    assert ": \"${BACKEND_MEMORY:=8Gi}\"" in content
     assert ": \"${BACKEND_CPU:=4}\"" in content
     assert ": \"${BACKEND_CONCURRENCY:=1}\"" in content
     assert ": \"${BACKEND_MIN_INSTANCES:=0}\"" in content

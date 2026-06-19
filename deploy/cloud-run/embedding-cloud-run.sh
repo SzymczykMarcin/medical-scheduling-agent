@@ -5,7 +5,7 @@ set -euo pipefail
 : "${REGION:?Set REGION, for example europe-west1.}"
 : "${EMBEDDING_SERVICE:=medical-scheduling-embedding}"
 : "${EMBEDDING_OLLAMA_MODEL:=embeddinggemma:latest}"
-: "${EMBEDDING_MEMORY:=8Gi}"
+: "${EMBEDDING_MEMORY:=4Gi}"
 : "${EMBEDDING_CPU:=4}"
 : "${EMBEDDING_CONCURRENCY:=4}"
 : "${EMBEDDING_MIN_INSTANCES:=0}"

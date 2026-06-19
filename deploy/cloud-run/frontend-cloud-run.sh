@@ -8,10 +8,10 @@ set -euo pipefail
 : "${FRONTEND_SERVICE:=medical-scheduling-frontend}"
 : "${AR_REPOSITORY:=medical-scheduling-agent}"
 : "${FRONTEND_IMAGE:=${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPOSITORY}/${FRONTEND_SERVICE}:latest}"
-: "${FRONTEND_MEMORY:=512Mi}"
+: "${FRONTEND_MEMORY:=128Mi}"
 : "${FRONTEND_CPU:=1}"
 : "${FRONTEND_CONCURRENCY:=80}"
-: "${FRONTEND_MAX_INSTANCES:=2}"
+: "${FRONTEND_MAX_INSTANCES:=1}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"

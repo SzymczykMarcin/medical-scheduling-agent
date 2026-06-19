@@ -10,7 +10,7 @@ set -euo pipefail
 : "${BACKEND_SERVICE_ACCOUNT_EMAIL:=}"
 : "${AR_REPOSITORY:=medical-scheduling-agent}"
 : "${BACKEND_IMAGE:=${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPOSITORY}/${BACKEND_SERVICE}:latest}"
-: "${BACKEND_MEMORY:=16Gi}"
+: "${BACKEND_MEMORY:=8Gi}"
 : "${BACKEND_CPU:=4}"
 : "${BACKEND_CONCURRENCY:=1}"
 : "${BACKEND_MIN_INSTANCES:=0}"

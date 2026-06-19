@@ -5,7 +5,7 @@ set -euo pipefail
 : "${REGION:?Set REGION, for example europe-west1.}"
 : "${BIELIK_SERVICE:=medical-scheduling-bielik}"
 : "${BIELIK_OLLAMA_MODEL:=SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0}"
-: "${BIELIK_MEMORY:=16Gi}"
+: "${BIELIK_MEMORY:=10Gi}"
 : "${BIELIK_CPU:=8}"
 : "${BIELIK_CONCURRENCY:=4}"
 : "${BIELIK_MIN_INSTANCES:=0}"
