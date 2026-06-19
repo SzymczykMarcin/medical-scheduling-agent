@@ -16,6 +16,23 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 BACKEND_SERVICE_ACCOUNT_EMAIL="${BACKEND_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com"
+BACKEND_URL=""
+
+print_backend_logs_on_error() {
+  status=$?
+  if [ "${status}" -eq 0 ]; then
+    return
+  fi
+
+  echo ""
+  echo "Deployment failed with status ${status}." >&2
+  echo "Recent backend logs for diagnostics:" >&2
+  gcloud run services logs read "${BACKEND_SERVICE}" \
+    --region "${REGION}" \
+    --limit 160 >&2 || true
+}
+
+trap print_backend_logs_on_error EXIT
 
 if [ "${PROJECT_ID}" = "your-google-cloud-project-id" ] || [ "${PROJECT_ID}" = "your-project-id" ]; then
   echo "PROJECT_ID is still a placeholder: ${PROJECT_ID}" >&2
@@ -69,6 +86,7 @@ gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
 echo "Deploying GPU demo profile: backend, ASR, Bielik, and embeddings in one L4 service."
 
 OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://127.0.0.1:11434}" \
+OLLAMA_LLM_LIBRARY="${OLLAMA_LLM_LIBRARY:-cuda}" \
 OLLAMA_AUTH_MODE="${OLLAMA_AUTH_MODE:-none}" \
 OLLAMA_TIMEOUT_SECONDS="${OLLAMA_TIMEOUT_SECONDS:-600}" \
 EMBEDDING_BASE_URL="${EMBEDDING_BASE_URL:-http://127.0.0.1:11434}" \

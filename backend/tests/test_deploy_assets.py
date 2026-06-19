@@ -124,6 +124,7 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert ": \"${BACKEND_GPU_TYPE:=nvidia-l4}\"" in content
     assert ": \"${ASR_DEVICE:=cuda}\"" in content
     assert ": \"${ASR_COMPUTE_TYPE:=int8_float16}\"" in content
+    assert ": \"${OLLAMA_LLM_LIBRARY:=cuda}\"" in content
     assert ": \"${OLLAMA_TIMEOUT_SECONDS:=600}\"" in content
     assert ": \"${PULL_MODELS_ON_START:=0}\"" in content
     assert ": \"${RAG_BACKEND:=bigquery-vector}\"" in content
@@ -146,6 +147,7 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert '--min-instances "${BACKEND_MIN_INSTANCES}"' in content
     assert "RUNTIME_PROFILE=cloud-run" in content
     assert "OLLAMA_AUTH_MODE=${OLLAMA_AUTH_MODE}" in content
+    assert "OLLAMA_LLM_LIBRARY=${OLLAMA_LLM_LIBRARY}" in content
     assert "OLLAMA_TIMEOUT_SECONDS=${OLLAMA_TIMEOUT_SECONDS}" in content
     assert "PULL_MODELS_ON_START=${PULL_MODELS_ON_START}" in content
     assert "ASR_DEVICE=${ASR_DEVICE}" in content
@@ -169,7 +171,9 @@ def test_backend_dockerfile_contains_cloud_run_entrypoint() -> None:
     assert "ENV VIRTUAL_ENV=/opt/venv" in content
     assert 'ENV PATH="/opt/venv/bin:${PATH}"' in content
     assert "ENV NVIDIA_SITE_PACKAGES=/opt/venv/lib/python3.12/site-packages/nvidia" in content
+    assert "ENV OLLAMA_LIBRARY_PATH=/usr/lib/ollama" in content
     assert "LD_LIBRARY_PATH" in content
+    assert "${OLLAMA_LIBRARY_PATH}" in content
     assert "${NVIDIA_SITE_PACKAGES}/cublas/lib" in content
     assert "${NVIDIA_SITE_PACKAGES}/cuda_runtime/lib" in content
     assert "${NVIDIA_SITE_PACKAGES}/cudnn/lib" in content
@@ -179,6 +183,7 @@ def test_backend_dockerfile_contains_cloud_run_entrypoint() -> None:
     assert "ARG BIELIK_OLLAMA_MODEL=SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0" in content
     assert "ARG EMBEDDING_OLLAMA_MODEL=embeddinggemma:latest" in content
     assert "COPY --from=ollama-runtime /bin/ollama /usr/local/bin/ollama" in content
+    assert "COPY --from=ollama-runtime /usr/lib/ollama /usr/lib/ollama" in content
     assert 'python -m venv "${VIRTUAL_ENV}"' in content
     assert "COPY backend/app" in content
     assert "COPY data/rag" in content
@@ -197,6 +202,16 @@ def test_backend_entrypoint_starts_local_ollama_before_api() -> None:
 
     assert "set -eu" in content
     assert 'export OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1:11434}"' in content
+    assert "log_startup_diagnostics" in content
+    assert "OLLAMA_LLM_LIBRARY" in content
+    assert "OLLAMA_LIBRARY_PATH" in content
+    assert "LD_LIBRARY_PATH" in content
+    assert "CUDA_VISIBLE_DEVICES" in content
+    assert "NVIDIA_VISIBLE_DEVICES" in content
+    assert "nvidia-smi" in content
+    assert "libcublas.so" in content
+    assert "libcudart.so" in content
+    assert "libcudnn.so" in content
     assert "ollama serve &" in content
     assert 'kill -0 "${ollama_pid}"' in content
     assert "Ollama server failed to start." in content
@@ -272,6 +287,7 @@ def test_demo_cloud_run_script_wires_all_ai_into_single_gpu_backend() -> None:
     assert "gcloud run services add-iam-policy-binding" not in content
     assert "roles/run.invoker" not in content
     assert 'OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://127.0.0.1:11434}"' in content
+    assert 'OLLAMA_LLM_LIBRARY="${OLLAMA_LLM_LIBRARY:-cuda}"' in content
     assert 'OLLAMA_AUTH_MODE="${OLLAMA_AUTH_MODE:-none}"' in content
     assert 'OLLAMA_TIMEOUT_SECONDS="${OLLAMA_TIMEOUT_SECONDS:-600}"' in content
     assert 'EMBEDDING_BASE_URL="${EMBEDDING_BASE_URL:-http://127.0.0.1:11434}"' in content
@@ -296,6 +312,9 @@ def test_demo_cloud_run_script_wires_all_ai_into_single_gpu_backend() -> None:
     assert "/api/debug/prewarm" in content
     assert "--basic-only" in content
     assert "Preparing backend before exposing the frontend." in content
+    assert "print_backend_logs_on_error" in content
+    assert "Recent backend logs for diagnostics:" in content
+    assert "gcloud run services logs read" in content
     assert "Backend preparation completed. Deploying frontend." in content
     assert "Demo deployment completed successfully." in content
     assert "Model runtime: local Ollama inside backend" in content

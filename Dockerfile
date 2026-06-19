@@ -9,7 +9,8 @@ ENV PIP_ROOT_USER_ACTION=ignore
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 ENV NVIDIA_SITE_PACKAGES=/opt/venv/lib/python3.12/site-packages/nvidia
-ENV LD_LIBRARY_PATH="${NVIDIA_SITE_PACKAGES}/cublas/lib:${NVIDIA_SITE_PACKAGES}/cuda_runtime/lib:${NVIDIA_SITE_PACKAGES}/cudnn/lib:${LD_LIBRARY_PATH}"
+ENV OLLAMA_LIBRARY_PATH=/usr/lib/ollama
+ENV LD_LIBRARY_PATH="${OLLAMA_LIBRARY_PATH}:${NVIDIA_SITE_PACKAGES}/cublas/lib:${NVIDIA_SITE_PACKAGES}/cuda_runtime/lib:${NVIDIA_SITE_PACKAGES}/cudnn/lib:${LD_LIBRARY_PATH}"
 ENV OLLAMA_HOST=127.0.0.1:11434
 ENV OLLAMA_MODELS=/models
 ENV OLLAMA_KEEP_ALIVE=0
@@ -20,6 +21,7 @@ ARG EMBEDDING_OLLAMA_MODEL=embeddinggemma:latest
 WORKDIR /app
 
 COPY --from=ollama-runtime /bin/ollama /usr/local/bin/ollama
+COPY --from=ollama-runtime /usr/lib/ollama /usr/lib/ollama
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential cmake ffmpeg libgomp1 \
