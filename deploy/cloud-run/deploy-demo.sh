@@ -4,8 +4,6 @@ set -euo pipefail
 : "${PROJECT_ID:?Set PROJECT_ID to your Google Cloud project ID.}"
 : "${REGION:?Set REGION, for example europe-west1.}"
 
-: "${BIELIK_SERVICE:=medical-scheduling-bielik}"
-: "${EMBEDDING_SERVICE:=medical-scheduling-embedding}"
 : "${BACKEND_SERVICE:=medical-scheduling-backend}"
 : "${FRONTEND_SERVICE:=medical-scheduling-frontend}"
 : "${BACKEND_SERVICE_ACCOUNT:=medical-scheduling-backend}"
@@ -46,7 +44,7 @@ gcloud services enable \
 
 if [ "${REPLACE_EXISTING_SERVICES}" = "1" ]; then
   echo "Replacing existing Cloud Run demo services before deploy."
-  for service in "${FRONTEND_SERVICE}" "${BACKEND_SERVICE}" "${BIELIK_SERVICE}" "${EMBEDDING_SERVICE}"; do
+  for service in "${FRONTEND_SERVICE}" "${BACKEND_SERVICE}" "medical-scheduling-bielik" "medical-scheduling-embedding"; do
     if gcloud run services describe "${service}" --region "${REGION}" >/dev/null 2>&1; then
       gcloud run services delete "${service}" --region "${REGION}" --quiet
     fi
@@ -68,35 +66,15 @@ gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
   --role "roles/bigquery.dataEditor" \
   --quiet >/dev/null
 
-"${SCRIPT_DIR}/bielik-cloud-run.sh"
-"${SCRIPT_DIR}/embedding-cloud-run.sh"
+echo "Deploying GPU demo profile: backend, ASR, Bielik, and embeddings in one L4 service."
 
-BIELIK_URL="$(gcloud run services describe "${BIELIK_SERVICE}" \
-  --region "${REGION}" \
-  --format "value(status.url)")"
-EMBEDDING_URL="$(gcloud run services describe "${EMBEDDING_SERVICE}" \
-  --region "${REGION}" \
-  --format "value(status.url)")"
-
-gcloud run services add-iam-policy-binding "${BIELIK_SERVICE}" \
-  --region "${REGION}" \
-  --member "serviceAccount:${BACKEND_SERVICE_ACCOUNT_EMAIL}" \
-  --role "roles/run.invoker"
-
-gcloud run services add-iam-policy-binding "${EMBEDDING_SERVICE}" \
-  --region "${REGION}" \
-  --member "serviceAccount:${BACKEND_SERVICE_ACCOUNT_EMAIL}" \
-  --role "roles/run.invoker"
-
-echo "Deploying GPU demo profile: Bielik on L4, backend ASR on L4, min instances 0, max instances 1."
-
-OLLAMA_BASE_URL="${BIELIK_URL}" \
-OLLAMA_AUTH_MODE="google-id-token" \
+OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://127.0.0.1:11434}" \
+OLLAMA_AUTH_MODE="${OLLAMA_AUTH_MODE:-none}" \
 OLLAMA_TIMEOUT_SECONDS="${OLLAMA_TIMEOUT_SECONDS:-600}" \
-EMBEDDING_BASE_URL="${EMBEDDING_URL}" \
+EMBEDDING_BASE_URL="${EMBEDDING_BASE_URL:-http://127.0.0.1:11434}" \
 EMBEDDING_PROVIDER="${EMBEDDING_PROVIDER:-ollama-http}" \
 EMBEDDING_MODEL_NAME="${EMBEDDING_MODEL_NAME:-embeddinggemma:latest}" \
-EMBEDDING_AUTH_MODE="${EMBEDDING_AUTH_MODE:-google-id-token}" \
+EMBEDDING_AUTH_MODE="${EMBEDDING_AUTH_MODE:-none}" \
 EMBEDDING_TIMEOUT_SECONDS="${EMBEDDING_TIMEOUT_SECONDS:-600}" \
 RAG_BACKEND="${RAG_BACKEND:-bigquery-vector}" \
 RAG_INDEX_MODE="${RAG_INDEX_MODE:-managed-vector}" \
@@ -121,8 +99,7 @@ BACKEND_URL="$(gcloud run services describe "${BACKEND_SERVICE}" \
 
 echo "Preparing backend before exposing the frontend."
 echo "Backend URL: ${BACKEND_URL}"
-echo "Bielik URL: ${BIELIK_URL}"
-echo "Embedding URL: ${EMBEDDING_URL}"
+echo "Model runtime: local Ollama inside backend"
 
 if [ "${RUN_RAG_INGEST}" = "1" ]; then
   echo "Building RAG index. The frontend URL will be printed only after this succeeds."
@@ -157,6 +134,5 @@ gcloud run services update "${BACKEND_SERVICE}" \
 
 echo "Demo deployment completed successfully."
 echo "Backend URL: ${BACKEND_URL}"
-echo "Bielik URL: ${BIELIK_URL}"
-echo "Embedding URL: ${EMBEDDING_URL}"
+echo "Model runtime: local Ollama inside backend"
 echo "Frontend URL: ${FRONTEND_URL}"

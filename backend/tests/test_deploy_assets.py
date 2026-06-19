@@ -84,14 +84,14 @@ def test_cloud_run_scripts_are_parameterized() -> None:
         assert "C:\\" not in content
 
 
-def test_cloud_run_demo_defaults_fit_small_quota_projects() -> None:
+def test_cloud_run_demo_defaults_match_l4_gpu_constraints() -> None:
     bielik = (DEPLOY_DIR / "cloud-run" / "bielik-cloud-run.sh").read_text(encoding="utf-8")
     backend = (DEPLOY_DIR / "cloud-run" / "backend-cloud-run.sh").read_text(encoding="utf-8")
     embedding = (DEPLOY_DIR / "cloud-run" / "embedding-cloud-run.sh").read_text(encoding="utf-8")
     frontend = (DEPLOY_DIR / "cloud-run" / "frontend-cloud-run.sh").read_text(encoding="utf-8")
 
-    assert ': "${BIELIK_MEMORY:=10Gi}"' in bielik
-    assert ': "${BACKEND_MEMORY:=8Gi}"' in backend
+    assert ': "${BIELIK_MEMORY:=16Gi}"' in bielik
+    assert ': "${BACKEND_MEMORY:=16Gi}"' in backend
     assert ': "${EMBEDDING_MEMORY:=4Gi}"' in embedding
     assert ': "${FRONTEND_MEMORY:=128Mi}"' in frontend
     assert ': "${FRONTEND_MAX_INSTANCES:=1}"' in frontend
@@ -113,9 +113,9 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert ": \"${PROJECT_ID:?" in content
     assert ": \"${REGION:?" in content
     assert ": \"${FRONTEND_ORIGIN:?" in content
-    assert ": \"${OLLAMA_BASE_URL:?" in content
+    assert ': "${OLLAMA_BASE_URL:=http://127.0.0.1:11434}"' in content
     assert "BACKEND_SERVICE_ACCOUNT_EMAIL" in content
-    assert ": \"${BACKEND_MEMORY:=8Gi}\"" in content
+    assert ": \"${BACKEND_MEMORY:=16Gi}\"" in content
     assert ": \"${BACKEND_CPU:=4}\"" in content
     assert ": \"${BACKEND_CONCURRENCY:=1}\"" in content
     assert ": \"${BACKEND_MIN_INSTANCES:=0}\"" in content
@@ -125,15 +125,15 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert ": \"${ASR_DEVICE:=cuda}\"" in content
     assert ": \"${ASR_COMPUTE_TYPE:=int8_float16}\"" in content
     assert ": \"${OLLAMA_TIMEOUT_SECONDS:=600}\"" in content
+    assert ": \"${PULL_MODELS_ON_START:=0}\"" in content
     assert ": \"${RAG_BACKEND:=bigquery-vector}\"" in content
     assert ": \"${RAG_INDEX_MODE:=managed-vector}\"" in content
     assert ": \"${EMBEDDING_PROVIDER:=ollama-http}\"" in content
-    assert ": \"${EMBEDDING_BASE_URL:=}\"" in content
+    assert ': "${EMBEDDING_BASE_URL:=http://127.0.0.1:11434}"' in content
     assert ": \"${EMBEDDING_MODEL_NAME:=embeddinggemma:latest}\"" in content
-    assert ": \"${EMBEDDING_AUTH_MODE:=google-id-token}\"" in content
+    assert ": \"${EMBEDDING_AUTH_MODE:=none}\"" in content
     assert ": \"${EMBEDDING_TIMEOUT_SECONDS:=600}\"" in content
     assert ": \"${EMBEDDING_DEVICE:=cpu}\"" in content
-    assert "EMBEDDING_BASE_URL is required when RAG_BACKEND=bigquery-vector." in content
     assert "gcloud artifacts repositories describe" in content
     assert "gcloud artifacts repositories create" in content
     assert "gcloud builds submit" in content
@@ -147,6 +147,7 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert "RUNTIME_PROFILE=cloud-run" in content
     assert "OLLAMA_AUTH_MODE=${OLLAMA_AUTH_MODE}" in content
     assert "OLLAMA_TIMEOUT_SECONDS=${OLLAMA_TIMEOUT_SECONDS}" in content
+    assert "PULL_MODELS_ON_START=${PULL_MODELS_ON_START}" in content
     assert "ASR_DEVICE=${ASR_DEVICE}" in content
     assert "EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER}" in content
     assert "EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL}" in content
@@ -163,6 +164,7 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
 def test_backend_dockerfile_contains_cloud_run_entrypoint() -> None:
     content = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
 
+    assert "FROM ollama/ollama:0.23.4 AS ollama-runtime" in content
     assert "FROM python:3.12-slim" in content
     assert "ENV VIRTUAL_ENV=/opt/venv" in content
     assert 'ENV PATH="/opt/venv/bin:${PATH}"' in content
@@ -171,13 +173,35 @@ def test_backend_dockerfile_contains_cloud_run_entrypoint() -> None:
     assert "${NVIDIA_SITE_PACKAGES}/cublas/lib" in content
     assert "${NVIDIA_SITE_PACKAGES}/cuda_runtime/lib" in content
     assert "${NVIDIA_SITE_PACKAGES}/cudnn/lib" in content
+    assert "ENV OLLAMA_HOST=127.0.0.1:11434" in content
+    assert "ENV OLLAMA_MODELS=/models" in content
+    assert "ENV OLLAMA_KEEP_ALIVE=0" in content
+    assert "ARG BIELIK_OLLAMA_MODEL=SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0" in content
+    assert "ARG EMBEDDING_OLLAMA_MODEL=embeddinggemma:latest" in content
+    assert "COPY --from=ollama-runtime /bin/ollama /usr/local/bin/ollama" in content
     assert 'python -m venv "${VIRTUAL_ENV}"' in content
     assert "COPY backend/app" in content
     assert "COPY data/rag" in content
     assert 'python -m pip install ".[cloud]"' in content
+    assert 'ollama pull "${BIELIK_OLLAMA_MODEL}"' in content
+    assert 'ollama pull "${EMBEDDING_OLLAMA_MODEL}"' in content
+    assert "COPY deploy/cloud-run/backend-entrypoint.sh /app/backend-entrypoint.sh" in content
     assert "useradd --create-home" in content
-    assert "chown -R app:app /app /tmp/medical-scheduling-agent" in content
+    assert 'chown -R app:app /app /tmp/medical-scheduling-agent "${OLLAMA_MODELS}"' in content
     assert "USER app" in content
+    assert 'CMD ["sh", "/app/backend-entrypoint.sh"]' in content
+
+
+def test_backend_entrypoint_starts_local_ollama_before_api() -> None:
+    content = (DEPLOY_DIR / "cloud-run" / "backend-entrypoint.sh").read_text(encoding="utf-8")
+
+    assert "set -eu" in content
+    assert 'export OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1:11434}"' in content
+    assert "ollama serve &" in content
+    assert 'kill -0 "${ollama_pid}"' in content
+    assert "Ollama server failed to start." in content
+    assert 'ollama pull "${OLLAMA_MODEL:-SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0}"' in content
+    assert 'ollama pull "${EMBEDDING_MODEL_NAME:-embeddinggemma:latest}"' in content
     assert "uvicorn app.main:app" in content
 
 
@@ -211,7 +235,7 @@ def test_frontend_cloud_run_assets_build_static_react_app() -> None:
     assert "C:\\" not in script
 
 
-def test_demo_cloud_run_script_wires_private_model_to_public_backend() -> None:
+def test_demo_cloud_run_script_wires_all_ai_into_single_gpu_backend() -> None:
     content = (DEPLOY_DIR / "cloud-run" / "deploy-demo.sh").read_text(encoding="utf-8")
 
     assert ": \"${PROJECT_ID:?" in content
@@ -223,21 +247,26 @@ def test_demo_cloud_run_script_wires_private_model_to_public_backend() -> None:
     assert ": \"${REPLACE_EXISTING_SERVICES:=0}\"" in content
     assert "Replacing existing Cloud Run demo services before deploy." in content
     assert "gcloud run services delete" in content
+    assert '"medical-scheduling-bielik"' in content
+    assert '"medical-scheduling-embedding"' in content
     assert "gcloud iam service-accounts create" in content
-    assert "bielik-cloud-run.sh" in content
-    assert "embedding-cloud-run.sh" in content
-    assert "gcloud run services add-iam-policy-binding" in content
-    assert "roles/run.invoker" in content
-    assert 'OLLAMA_AUTH_MODE="google-id-token"' in content
+    assert "bielik-cloud-run.sh" not in content
+    assert "embedding-cloud-run.sh" not in content
+    assert "gcloud run services add-iam-policy-binding" not in content
+    assert "roles/run.invoker" not in content
+    assert 'OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://127.0.0.1:11434}"' in content
+    assert 'OLLAMA_AUTH_MODE="${OLLAMA_AUTH_MODE:-none}"' in content
     assert 'OLLAMA_TIMEOUT_SECONDS="${OLLAMA_TIMEOUT_SECONDS:-600}"' in content
-    assert 'EMBEDDING_BASE_URL="${EMBEDDING_URL}"' in content
+    assert 'EMBEDDING_BASE_URL="${EMBEDDING_BASE_URL:-http://127.0.0.1:11434}"' in content
     assert 'EMBEDDING_PROVIDER="${EMBEDDING_PROVIDER:-ollama-http}"' in content
+    assert 'EMBEDDING_AUTH_MODE="${EMBEDDING_AUTH_MODE:-none}"' in content
     assert 'EMBEDDING_TIMEOUT_SECONDS="${EMBEDDING_TIMEOUT_SECONDS:-600}"' in content
     assert 'RAG_BACKEND="${RAG_BACKEND:-bigquery-vector}"' in content
     assert 'RAG_INDEX_MODE="${RAG_INDEX_MODE:-managed-vector}"' in content
     assert 'BIGQUERY_PROJECT_ID="${BIGQUERY_PROJECT_ID:-${PROJECT_ID}}"' in content
     assert 'BACKEND_GPU_ENABLED="${BACKEND_GPU_ENABLED:-true}"' in content
     assert 'BACKEND_GPU_TYPE="${BACKEND_GPU_TYPE:-nvidia-l4}"' in content
+    assert 'BACKEND_MEMORY="${BACKEND_MEMORY:-16Gi}"' in content
     assert 'BACKEND_MIN_INSTANCES="${BACKEND_MIN_INSTANCES:-0}"' in content
     assert 'BACKEND_MAX_INSTANCES="${BACKEND_MAX_INSTANCES:-1}"' in content
     assert 'ASR_DEVICE="${ASR_DEVICE:-cuda}"' in content
@@ -252,6 +281,7 @@ def test_demo_cloud_run_script_wires_private_model_to_public_backend() -> None:
     assert "Preparing backend before exposing the frontend." in content
     assert "Backend preparation completed. Deploying frontend." in content
     assert "Demo deployment completed successfully." in content
+    assert "Model runtime: local Ollama inside backend" in content
     assert content.index("/api/rag/ingest") < content.index("frontend-cloud-run.sh")
     assert content.index("/api/debug/prewarm") < content.index("frontend-cloud-run.sh")
     assert content.index("--basic-only") < content.index("frontend-cloud-run.sh")
