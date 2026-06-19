@@ -208,9 +208,26 @@ def test_backend_entrypoint_starts_local_ollama_before_api() -> None:
 def test_backend_cloud_extra_installs_cuda_12_runtime_libraries() -> None:
     content = (REPO_ROOT / "backend" / "pyproject.toml").read_text(encoding="utf-8")
 
+    assert "local-rag = [" in content
+    assert '"chromadb>=0.5.0"' in content
+    assert '"sentence-transformers>=3.0.0"' in content
+    assert "postgres = [" in content
+    assert '"psycopg[binary]>=3.2.0"' in content
+    assert "legacy-private-model-services = [" in content
+    assert '"google-auth>=2.35.0"' in content
     assert "nvidia-cublas-cu12==12.6.4.1" in content
     assert "nvidia-cuda-runtime-cu12==12.6.77" in content
     assert "nvidia-cudnn-cu12==9.5.1.17" in content
+    assert content.index("local-rag = [") < content.index('"chromadb>=0.5.0"')
+    assert content.index("cloud = [") < content.index("nvidia-cublas-cu12")
+    assert content.index("postgres = [") < content.index('"psycopg[binary]>=3.2.0"')
+    assert content.index("legacy-private-model-services = [") < content.index('"google-auth>=2.35.0"')
+    assert content.index("cloud = [") < content.index("postgres = [")
+    cloud_extra = content[content.index("cloud = [") : content.index("postgres = [")]
+    assert "chromadb" not in cloud_extra
+    assert "sentence-transformers" not in cloud_extra
+    assert "psycopg" not in cloud_extra
+    assert "google-auth" not in cloud_extra
 
 
 def test_frontend_cloud_run_assets_build_static_react_app() -> None:
@@ -291,6 +308,7 @@ def test_demo_cloud_run_script_wires_all_ai_into_single_gpu_backend() -> None:
 def test_ci_runs_backend_and_frontend_checks() -> None:
     content = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
+    assert 'python -m pip install -e ".[dev,local-rag]"' in content
     assert "python -m ruff check ." in content
     assert 'python -m pytest tests -m "not local_ai"' in content
     assert "npm ci" in content

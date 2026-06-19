@@ -99,9 +99,13 @@ cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-pip install -e ".[dev]"
+pip install -e ".[dev,local-rag]"
 cd ..
 ```
+
+`local-rag` installs Chroma and `sentence-transformers` for the local vector
+store. The Cloud Run image intentionally installs only the `cloud` extra because
+it uses BigQuery Vector Search and local Ollama embeddings instead of Chroma.
 
 ### 5. Start The Backend
 
