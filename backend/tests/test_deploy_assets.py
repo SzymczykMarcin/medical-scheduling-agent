@@ -146,7 +146,7 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert '--gpu-type "${BACKEND_GPU_TYPE}"' in content
     assert "--no-cpu-throttling" in content
     assert "--no-gpu-zonal-redundancy" in content
-    assert '--remove-env-vars "OLLAMA_LLM_LIBRARY"' in content
+    assert "--remove-env-vars" not in content
     assert '--min-instances "${BACKEND_MIN_INSTANCES}"' in content
     assert "RUNTIME_PROFILE=cloud-run" in content
     assert "OLLAMA_AUTH_MODE=${OLLAMA_AUTH_MODE}" in content

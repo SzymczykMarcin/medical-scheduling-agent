@@ -84,6 +84,5 @@ gcloud run deploy "${BACKEND_SERVICE}" \
   --timeout 600 \
   --min-instances "${BACKEND_MIN_INSTANCES}" \
   --max-instances "${BACKEND_MAX_INSTANCES}" \
-  --remove-env-vars "OLLAMA_LLM_LIBRARY" \
   --set-env-vars "${backend_env_vars}" \
   --labels "app=medical-scheduling-agent,component=backend"
