@@ -125,6 +125,7 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert ": \"${ASR_DEVICE:=cuda}\"" in content
     assert ": \"${ASR_COMPUTE_TYPE:=int8_float16}\"" in content
     assert ": \"${OLLAMA_LLM_LIBRARY:=cuda}\"" in content
+    assert ": \"${OLLAMA_KEEP_ALIVE:=-1}\"" in content
     assert ": \"${OLLAMA_TIMEOUT_SECONDS:=600}\"" in content
     assert ": \"${PULL_MODELS_ON_START:=0}\"" in content
     assert ": \"${RAG_BACKEND:=bigquery-vector}\"" in content
@@ -148,6 +149,7 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert "RUNTIME_PROFILE=cloud-run" in content
     assert "OLLAMA_AUTH_MODE=${OLLAMA_AUTH_MODE}" in content
     assert "OLLAMA_LLM_LIBRARY=${OLLAMA_LLM_LIBRARY}" in content
+    assert "OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE}" in content
     assert "OLLAMA_TIMEOUT_SECONDS=${OLLAMA_TIMEOUT_SECONDS}" in content
     assert "PULL_MODELS_ON_START=${PULL_MODELS_ON_START}" in content
     assert "ASR_DEVICE=${ASR_DEVICE}" in content
@@ -166,25 +168,23 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
 def test_backend_dockerfile_contains_cloud_run_entrypoint() -> None:
     content = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
 
-    assert "FROM ollama/ollama:0.23.4 AS ollama-runtime" in content
-    assert "FROM python:3.12-slim" in content
+    assert "FROM ollama/ollama:0.23.4" in content
+    assert "FROM python:3.12-slim" not in content
+    assert "COPY --from=ollama-runtime" not in content
     assert "ENV VIRTUAL_ENV=/opt/venv" in content
     assert 'ENV PATH="/opt/venv/bin:${PATH}"' in content
-    assert "ENV NVIDIA_SITE_PACKAGES=/opt/venv/lib/python3.12/site-packages/nvidia" in content
     assert "ENV OLLAMA_LIBRARY_PATH=/usr/lib/ollama" in content
-    assert "LD_LIBRARY_PATH" in content
-    assert "${OLLAMA_LIBRARY_PATH}" in content
-    assert "${NVIDIA_SITE_PACKAGES}/cublas/lib" in content
-    assert "${NVIDIA_SITE_PACKAGES}/cuda_runtime/lib" in content
-    assert "${NVIDIA_SITE_PACKAGES}/cudnn/lib" in content
     assert "ENV OLLAMA_HOST=127.0.0.1:11434" in content
     assert "ENV OLLAMA_MODELS=/models" in content
-    assert "ENV OLLAMA_KEEP_ALIVE=0" in content
+    assert "ENV OLLAMA_KEEP_ALIVE=-1" in content
     assert "ARG BIELIK_OLLAMA_MODEL=SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0" in content
     assert "ARG EMBEDDING_OLLAMA_MODEL=embeddinggemma:latest" in content
-    assert "COPY --from=ollama-runtime /bin/ollama /usr/local/bin/ollama" in content
-    assert "COPY --from=ollama-runtime /usr/lib/ollama /usr/lib/ollama" in content
-    assert 'python -m venv "${VIRTUAL_ENV}"' in content
+    assert "Unsupported ollama base image" in content
+    assert "apt-get install -y --no-install-recommends" in content
+    assert "python3" in content
+    assert "python3-pip" in content
+    assert "python3-venv" in content
+    assert 'python3 -m venv "${VIRTUAL_ENV}"' in content
     assert "COPY backend/app" in content
     assert "COPY data/rag" in content
     assert 'python -m pip install ".[cloud]"' in content
@@ -194,6 +194,7 @@ def test_backend_dockerfile_contains_cloud_run_entrypoint() -> None:
     assert "useradd --create-home" in content
     assert 'chown -R app:app /app /tmp/medical-scheduling-agent "${OLLAMA_MODELS}"' in content
     assert "USER app" in content
+    assert "ENTRYPOINT []" in content
     assert 'CMD ["sh", "/app/backend-entrypoint.sh"]' in content
 
 
@@ -202,7 +203,11 @@ def test_backend_entrypoint_starts_local_ollama_before_api() -> None:
 
     assert "set -eu" in content
     assert 'export OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1:11434}"' in content
+    assert "PYTHON_SITE_PACKAGES" in content
+    assert 'export NVIDIA_SITE_PACKAGES="${NVIDIA_SITE_PACKAGES:-${PYTHON_SITE_PACKAGES}/nvidia}"' in content
+    assert "export LD_LIBRARY_PATH=" in content
     assert "log_startup_diagnostics" in content
+    assert "OLLAMA_KEEP_ALIVE" in content
     assert "OLLAMA_LLM_LIBRARY" in content
     assert "OLLAMA_LIBRARY_PATH" in content
     assert "LD_LIBRARY_PATH" in content
@@ -288,6 +293,7 @@ def test_demo_cloud_run_script_wires_all_ai_into_single_gpu_backend() -> None:
     assert "roles/run.invoker" not in content
     assert 'OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://127.0.0.1:11434}"' in content
     assert 'OLLAMA_LLM_LIBRARY="${OLLAMA_LLM_LIBRARY:-cuda}"' in content
+    assert 'OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:--1}"' in content
     assert 'OLLAMA_AUTH_MODE="${OLLAMA_AUTH_MODE:-none}"' in content
     assert 'OLLAMA_TIMEOUT_SECONDS="${OLLAMA_TIMEOUT_SECONDS:-600}"' in content
     assert 'EMBEDDING_BASE_URL="${EMBEDDING_BASE_URL:-http://127.0.0.1:11434}"' in content

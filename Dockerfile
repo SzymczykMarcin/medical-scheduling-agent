@@ -1,6 +1,4 @@
-FROM ollama/ollama:0.23.4 AS ollama-runtime
-
-FROM python:3.12-slim
+FROM ollama/ollama:0.23.4
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -8,25 +6,33 @@ ENV PIP_NO_CACHE_DIR=1
 ENV PIP_ROOT_USER_ACTION=ignore
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
-ENV NVIDIA_SITE_PACKAGES=/opt/venv/lib/python3.12/site-packages/nvidia
 ENV OLLAMA_LIBRARY_PATH=/usr/lib/ollama
-ENV LD_LIBRARY_PATH="${OLLAMA_LIBRARY_PATH}:${NVIDIA_SITE_PACKAGES}/cublas/lib:${NVIDIA_SITE_PACKAGES}/cuda_runtime/lib:${NVIDIA_SITE_PACKAGES}/cudnn/lib:${LD_LIBRARY_PATH}"
 ENV OLLAMA_HOST=127.0.0.1:11434
 ENV OLLAMA_MODELS=/models
-ENV OLLAMA_KEEP_ALIVE=0
+ENV OLLAMA_KEEP_ALIVE=-1
 
 ARG BIELIK_OLLAMA_MODEL=SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0
 ARG EMBEDDING_OLLAMA_MODEL=embeddinggemma:latest
 
 WORKDIR /app
 
-COPY --from=ollama-runtime /bin/ollama /usr/local/bin/ollama
-COPY --from=ollama-runtime /usr/lib/ollama /usr/lib/ollama
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential cmake ffmpeg libgomp1 \
-    && python -m venv "${VIRTUAL_ENV}" \
-    && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    if ! command -v apt-get >/dev/null 2>&1; then \
+        echo "Unsupported ollama base image: apt-get is required to install Python backend dependencies." >&2; \
+        exit 1; \
+    fi; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        cmake \
+        ffmpeg \
+        libgomp1 \
+        python3 \
+        python3-pip \
+        python3-venv; \
+    python3 -m venv "${VIRTUAL_ENV}"; \
+    rm -rf /var/lib/apt/lists/*
 
 COPY backend/pyproject.toml /app/backend/pyproject.toml
 COPY backend/app /app/backend/app
@@ -62,4 +68,5 @@ ENV SQLITE_DATABASE_URL=sqlite:////tmp/medical-scheduling-agent/demo.sqlite3
 
 USER app
 
+ENTRYPOINT []
 CMD ["sh", "/app/backend-entrypoint.sh"]

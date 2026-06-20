@@ -209,7 +209,8 @@ This script performs the full demo deployment:
 1. Enables required Google APIs.
 2. Creates the backend service account if missing.
 3. Builds and deploys one public FastAPI backend on NVIDIA L4 GPU. The backend
-   image contains local Ollama, Bielik, EmbeddingGemma, and `faster-whisper`.
+   image is based on the official Ollama image, then installs FastAPI,
+   `faster-whisper`, Bielik, and EmbeddingGemma into the same container.
 4. Grants the backend service account BigQuery permissions for the demo vector
    table.
 5. Runs RAG ingestion into BigQuery Vector Search.
@@ -244,6 +245,10 @@ table, and prewarm downloads or loads the ASR model. These steps are
 expected. If a model cannot be downloaded or a service cannot be reached, the
 script fails instead of using a fake fallback. The frontend URL is printed only
 after RAG ingestion, model prewarm, and the backend smoke test have succeeded.
+
+The backend startup log should show Ollama GPU detection at runtime. During the
+Docker build, model pulls can still print CPU-only Ollama logs because Cloud
+Build does not provide the Cloud Run GPU. Runtime logs are the source of truth.
 
 ### 4. Open The Frontend
 

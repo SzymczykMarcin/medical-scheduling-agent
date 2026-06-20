@@ -3,13 +3,30 @@ set -eu
 
 export OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1:11434}"
 export OLLAMA_MODELS="${OLLAMA_MODELS:-/models}"
+export OLLAMA_LIBRARY_PATH="${OLLAMA_LIBRARY_PATH:-/usr/lib/ollama}"
+
+PYTHON_SITE_PACKAGES="$(python - <<'PY'
+import site
+
+paths = site.getsitepackages()
+if not paths:
+    raise SystemExit("No Python site-packages paths found.")
+print(paths[0])
+PY
+)"
+
+export NVIDIA_SITE_PACKAGES="${NVIDIA_SITE_PACKAGES:-${PYTHON_SITE_PACKAGES}/nvidia}"
+export LD_LIBRARY_PATH="${OLLAMA_LIBRARY_PATH}:${NVIDIA_SITE_PACKAGES}/cublas/lib:${NVIDIA_SITE_PACKAGES}/cuda_runtime/lib:${NVIDIA_SITE_PACKAGES}/cudnn/lib:${LD_LIBRARY_PATH:-}"
 
 log_startup_diagnostics() {
   echo "[startup] Backend container diagnostics"
   echo "[startup] OLLAMA_HOST=${OLLAMA_HOST}"
   echo "[startup] OLLAMA_MODELS=${OLLAMA_MODELS}"
+  echo "[startup] OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-<unset>}"
   echo "[startup] OLLAMA_LLM_LIBRARY=${OLLAMA_LLM_LIBRARY:-<auto>}"
   echo "[startup] OLLAMA_LIBRARY_PATH=${OLLAMA_LIBRARY_PATH:-<unset>}"
+  echo "[startup] PYTHON_SITE_PACKAGES=${PYTHON_SITE_PACKAGES}"
+  echo "[startup] NVIDIA_SITE_PACKAGES=${NVIDIA_SITE_PACKAGES}"
   echo "[startup] LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-<unset>}"
   echo "[startup] CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-<unset>}"
   echo "[startup] NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-<unset>}"
@@ -22,19 +39,19 @@ log_startup_diagnostics() {
   fi
 
   echo "[startup] Ollama runtime libraries:"
-  if [ -d "${OLLAMA_LIBRARY_PATH:-/usr/lib/ollama}" ]; then
-    find "${OLLAMA_LIBRARY_PATH:-/usr/lib/ollama}" -maxdepth 2 -type f | sort | sed -n '1,80p'
+  if [ -d "${OLLAMA_LIBRARY_PATH}" ]; then
+    find "${OLLAMA_LIBRARY_PATH}" -maxdepth 2 -type f | sort | sed -n '1,120p'
   else
-    echo "[startup] Missing Ollama library directory: ${OLLAMA_LIBRARY_PATH:-/usr/lib/ollama}" >&2
+    echo "[startup] Missing Ollama library directory: ${OLLAMA_LIBRARY_PATH}" >&2
   fi
 
   echo "[startup] Python CUDA runtime libraries:"
-  if [ -d "${NVIDIA_SITE_PACKAGES:-/opt/venv/lib/python3.12/site-packages/nvidia}" ]; then
+  if [ -d "${NVIDIA_SITE_PACKAGES}" ]; then
     find "${NVIDIA_SITE_PACKAGES}" -type f \
       \( -name 'libcublas.so*' -o -name 'libcudart.so*' -o -name 'libcudnn.so*' \) \
       | sort | sed -n '1,80p'
   else
-    echo "[startup] Missing NVIDIA_SITE_PACKAGES directory: ${NVIDIA_SITE_PACKAGES:-<unset>}" >&2
+    echo "[startup] Missing NVIDIA_SITE_PACKAGES directory: ${NVIDIA_SITE_PACKAGES}" >&2
   fi
 }
 
