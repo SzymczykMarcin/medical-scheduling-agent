@@ -86,8 +86,9 @@ gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
 echo "Deploying GPU demo profile: backend, ASR, Bielik, and embeddings in one L4 service."
 
 OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://127.0.0.1:11434}" \
-OLLAMA_LLM_LIBRARY="${OLLAMA_LLM_LIBRARY:-cuda}" \
 OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:--1}" \
+OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL:-1}" \
+OLLAMA_DEBUG="${OLLAMA_DEBUG:-1}" \
 OLLAMA_AUTH_MODE="${OLLAMA_AUTH_MODE:-none}" \
 OLLAMA_TIMEOUT_SECONDS="${OLLAMA_TIMEOUT_SECONDS:-600}" \
 EMBEDDING_BASE_URL="${EMBEDDING_BASE_URL:-http://127.0.0.1:11434}" \

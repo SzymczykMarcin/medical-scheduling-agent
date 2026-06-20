@@ -249,6 +249,8 @@ after RAG ingestion, model prewarm, and the backend smoke test have succeeded.
 The backend startup log should show Ollama GPU detection at runtime. During the
 Docker build, model pulls can still print CPU-only Ollama logs because Cloud
 Build does not provide the Cloud Run GPU. Runtime logs are the source of truth.
+The prewarm step also checks Ollama's loaded-model metadata and fails the
+deployment if the Cloud Run GPU profile keeps Bielik or EmbeddingGemma on CPU.
 
 ### 4. Open The Frontend
 

@@ -124,8 +124,9 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert ": \"${BACKEND_GPU_TYPE:=nvidia-l4}\"" in content
     assert ": \"${ASR_DEVICE:=cuda}\"" in content
     assert ": \"${ASR_COMPUTE_TYPE:=int8_float16}\"" in content
-    assert ": \"${OLLAMA_LLM_LIBRARY:=cuda}\"" in content
     assert ": \"${OLLAMA_KEEP_ALIVE:=-1}\"" in content
+    assert ": \"${OLLAMA_NUM_PARALLEL:=1}\"" in content
+    assert ": \"${OLLAMA_DEBUG:=1}\"" in content
     assert ": \"${OLLAMA_TIMEOUT_SECONDS:=600}\"" in content
     assert ": \"${PULL_MODELS_ON_START:=0}\"" in content
     assert ": \"${RAG_BACKEND:=bigquery-vector}\"" in content
@@ -145,11 +146,14 @@ def test_backend_cloud_run_script_deploys_public_demo_backend() -> None:
     assert '--gpu-type "${BACKEND_GPU_TYPE}"' in content
     assert "--no-cpu-throttling" in content
     assert "--no-gpu-zonal-redundancy" in content
+    assert '--remove-env-vars "OLLAMA_LLM_LIBRARY"' in content
     assert '--min-instances "${BACKEND_MIN_INSTANCES}"' in content
     assert "RUNTIME_PROFILE=cloud-run" in content
     assert "OLLAMA_AUTH_MODE=${OLLAMA_AUTH_MODE}" in content
-    assert "OLLAMA_LLM_LIBRARY=${OLLAMA_LLM_LIBRARY}" in content
+    assert "OLLAMA_LLM_LIBRARY=${OLLAMA_LLM_LIBRARY}" not in content
     assert "OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE}" in content
+    assert "OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL}" in content
+    assert "OLLAMA_DEBUG=${OLLAMA_DEBUG}" in content
     assert "OLLAMA_TIMEOUT_SECONDS=${OLLAMA_TIMEOUT_SECONDS}" in content
     assert "PULL_MODELS_ON_START=${PULL_MODELS_ON_START}" in content
     assert "ASR_DEVICE=${ASR_DEVICE}" in content
@@ -205,10 +209,12 @@ def test_backend_entrypoint_starts_local_ollama_before_api() -> None:
     assert 'export OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1:11434}"' in content
     assert "PYTHON_SITE_PACKAGES" in content
     assert 'export NVIDIA_SITE_PACKAGES="${NVIDIA_SITE_PACKAGES:-${PYTHON_SITE_PACKAGES}/nvidia}"' in content
-    assert "export LD_LIBRARY_PATH=" in content
+    assert "PYTHON_CUDA_LIBRARY_PATH" in content
     assert "log_startup_diagnostics" in content
     assert "OLLAMA_KEEP_ALIVE" in content
-    assert "OLLAMA_LLM_LIBRARY" in content
+    assert "OLLAMA_NUM_PARALLEL" in content
+    assert "OLLAMA_DEBUG" in content
+    assert "OLLAMA_LLM_LIBRARY=${OLLAMA_LLM_LIBRARY:-<unset/autodetect>}" in content
     assert "OLLAMA_LIBRARY_PATH" in content
     assert "LD_LIBRARY_PATH" in content
     assert "CUDA_VISIBLE_DEVICES" in content
@@ -217,7 +223,10 @@ def test_backend_entrypoint_starts_local_ollama_before_api() -> None:
     assert "libcublas.so" in content
     assert "libcudart.so" in content
     assert "libcudnn.so" in content
+    assert "env \\" in content
+    assert "-u OLLAMA_LLM_LIBRARY" in content
     assert "ollama serve &" in content
+    assert 'export LD_LIBRARY_PATH="${PYTHON_CUDA_LIBRARY_PATH}:${ORIGINAL_LD_LIBRARY_PATH}"' in content
     assert 'kill -0 "${ollama_pid}"' in content
     assert "Ollama server failed to start." in content
     assert 'ollama pull "${OLLAMA_MODEL:-SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0}"' in content
@@ -292,8 +301,9 @@ def test_demo_cloud_run_script_wires_all_ai_into_single_gpu_backend() -> None:
     assert "gcloud run services add-iam-policy-binding" not in content
     assert "roles/run.invoker" not in content
     assert 'OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://127.0.0.1:11434}"' in content
-    assert 'OLLAMA_LLM_LIBRARY="${OLLAMA_LLM_LIBRARY:-cuda}"' in content
     assert 'OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:--1}"' in content
+    assert 'OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL:-1}"' in content
+    assert 'OLLAMA_DEBUG="${OLLAMA_DEBUG:-1}"' in content
     assert 'OLLAMA_AUTH_MODE="${OLLAMA_AUTH_MODE:-none}"' in content
     assert 'OLLAMA_TIMEOUT_SECONDS="${OLLAMA_TIMEOUT_SECONDS:-600}"' in content
     assert 'EMBEDDING_BASE_URL="${EMBEDDING_BASE_URL:-http://127.0.0.1:11434}"' in content

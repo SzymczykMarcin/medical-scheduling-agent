@@ -1,4 +1,5 @@
 from datetime import date
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
@@ -177,6 +178,7 @@ def test_prewarm_endpoint_reports_loaded_components(monkeypatch) -> None:
         "asr",
         "embedding",
         "bielik",
+        "ollama_gpu",
     ]
     assert calls == ["asr", "embedding", "bielik"]
 
@@ -207,3 +209,35 @@ def test_prewarm_endpoint_fails_visibly(monkeypatch) -> None:
     assert body["components"][0]["name"] == "asr"
     assert body["components"][0]["status"] == "failed"
     assert "ASR download failed" in body["components"][0]["error_message"]
+
+
+def test_cloud_run_prewarm_fails_when_ollama_uses_cpu(monkeypatch) -> None:
+    monkeypatch.setattr(
+        debug,
+        "settings",
+        SimpleNamespace(
+            runtime_profile="cloud-run",
+            llm_provider="ollama-http",
+            ollama_model="SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0",
+            embedding_model_name="embeddinggemma:latest",
+        ),
+    )
+    monkeypatch.setattr(
+        debug,
+        "_get_ollama_json",
+        lambda path: {
+            "models": [
+                {
+                    "model": "SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0",
+                    "size_vram": 0,
+                }
+            ]
+        },
+    )
+
+    try:
+        debug._assert_ollama_gpu_runtime()
+    except RuntimeError as exc:
+        assert "CPU models" in str(exc)
+    else:
+        raise AssertionError("Expected CPU-only Ollama runtime to fail Cloud Run prewarm.")

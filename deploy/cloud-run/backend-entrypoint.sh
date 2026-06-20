@@ -3,6 +3,9 @@ set -eu
 
 export OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1:11434}"
 export OLLAMA_MODELS="${OLLAMA_MODELS:-/models}"
+export OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:--1}"
+export OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL:-1}"
+export OLLAMA_DEBUG="${OLLAMA_DEBUG:-1}"
 export OLLAMA_LIBRARY_PATH="${OLLAMA_LIBRARY_PATH:-/usr/lib/ollama}"
 
 PYTHON_SITE_PACKAGES="$(python - <<'PY'
@@ -16,18 +19,22 @@ PY
 )"
 
 export NVIDIA_SITE_PACKAGES="${NVIDIA_SITE_PACKAGES:-${PYTHON_SITE_PACKAGES}/nvidia}"
-export LD_LIBRARY_PATH="${OLLAMA_LIBRARY_PATH}:${NVIDIA_SITE_PACKAGES}/cublas/lib:${NVIDIA_SITE_PACKAGES}/cuda_runtime/lib:${NVIDIA_SITE_PACKAGES}/cudnn/lib:${LD_LIBRARY_PATH:-}"
+PYTHON_CUDA_LIBRARY_PATH="${NVIDIA_SITE_PACKAGES}/cublas/lib:${NVIDIA_SITE_PACKAGES}/cuda_runtime/lib:${NVIDIA_SITE_PACKAGES}/cudnn/lib"
+ORIGINAL_LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
 
 log_startup_diagnostics() {
   echo "[startup] Backend container diagnostics"
   echo "[startup] OLLAMA_HOST=${OLLAMA_HOST}"
   echo "[startup] OLLAMA_MODELS=${OLLAMA_MODELS}"
   echo "[startup] OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-<unset>}"
-  echo "[startup] OLLAMA_LLM_LIBRARY=${OLLAMA_LLM_LIBRARY:-<auto>}"
+  echo "[startup] OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-<unset>}"
+  echo "[startup] OLLAMA_DEBUG=${OLLAMA_DEBUG:-<unset>}"
+  echo "[startup] OLLAMA_LLM_LIBRARY=${OLLAMA_LLM_LIBRARY:-<unset/autodetect>}"
   echo "[startup] OLLAMA_LIBRARY_PATH=${OLLAMA_LIBRARY_PATH:-<unset>}"
   echo "[startup] PYTHON_SITE_PACKAGES=${PYTHON_SITE_PACKAGES}"
   echo "[startup] NVIDIA_SITE_PACKAGES=${NVIDIA_SITE_PACKAGES}"
-  echo "[startup] LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-<unset>}"
+  echo "[startup] ORIGINAL_LD_LIBRARY_PATH=${ORIGINAL_LD_LIBRARY_PATH:-<unset>}"
+  echo "[startup] PYTHON_CUDA_LIBRARY_PATH=${PYTHON_CUDA_LIBRARY_PATH}"
   echo "[startup] CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-<unset>}"
   echo "[startup] NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-<unset>}"
 
@@ -57,7 +64,17 @@ log_startup_diagnostics() {
 
 log_startup_diagnostics
 
-ollama serve &
+env \
+  -u OLLAMA_LLM_LIBRARY \
+  OLLAMA_HOST="${OLLAMA_HOST}" \
+  OLLAMA_MODELS="${OLLAMA_MODELS}" \
+  OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE}" \
+  OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL}" \
+  OLLAMA_DEBUG="${OLLAMA_DEBUG}" \
+  PATH="${PATH}" \
+  HOME="${HOME:-/home/app}" \
+  NVIDIA_VISIBLE_DEVICES="${NVIDIA_VISIBLE_DEVICES:-all}" \
+  ollama serve &
 ollama_pid="$!"
 
 cleanup() {
@@ -78,6 +95,8 @@ if [ "${PULL_MODELS_ON_START:-0}" = "1" ]; then
   ollama pull "${OLLAMA_MODEL:-SpeakLeash/bielik-4.5b-v3.0-instruct:Q8_0}"
   ollama pull "${EMBEDDING_MODEL_NAME:-embeddinggemma:latest}"
 fi
+
+export LD_LIBRARY_PATH="${PYTHON_CUDA_LIBRARY_PATH}:${ORIGINAL_LD_LIBRARY_PATH}"
 
 uvicorn app.main:app \
   --host "${BACKEND_HOST:-0.0.0.0}" \
