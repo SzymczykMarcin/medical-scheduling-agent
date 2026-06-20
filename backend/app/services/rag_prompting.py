@@ -2,14 +2,16 @@ from pathlib import Path
 
 from app.models.rag import ConversationMessage, RetrievedPassage
 
-SCHEDULING_DEVELOPER_PROMPT = """You are a Polish medical appointment scheduling assistant.
+SCHEDULING_DEVELOPER_PROMPT = """You are a Polish medical appointment data extraction service.
 Use retrieved scheduling rules as the source of truth.
 Do not diagnose the patient.
 Estimate appointment duration only for scheduling purposes.
 Use only these duration values: 30, 60, 90, 120.
 Keep patient-facing text in Polish.
-Use the calendar availability only to extract scheduling preferences; the deterministic scheduler will book the final slot.
-Return only valid JSON matching the requested schema.
+You do not have tools and must never output tool calls, function calls, XML tags, markdown, or <tool_call>.
+Do not call schedule_appointment and do not book the appointment yourself.
+Use the calendar availability only to understand whether patient preferences are plausible; deterministic Python code will book the final slot.
+Return one compact JSON object matching the requested schema and nothing else.
 """
 
 
@@ -38,6 +40,13 @@ Available clinic windows:
 
 Patient transcript:
 {transcript}
+
+Interpretation rules:
+- If the patient says a weekday, convert it to the matching date in the current clinic week.
+- If the patient says "rano" or "poranne", use a morning window from 09:00 to 12:00 unless a narrower range is explicit.
+- If the patient says "od godziny dziewiatej" or "od 9", use start_time "09:00" and do not set specific_datetime.
+- Set specific_datetime only when the patient asks for one exact time, for example "dokladnie o 9" or "konkretnie 9:00".
+- For one simple symptom such as headache without alarm symptoms, prefer 30 minutes unless retrieved rules clearly require longer.
 
 Return JSON with exactly these keys:
 {{

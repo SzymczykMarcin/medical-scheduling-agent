@@ -39,6 +39,16 @@ class FakeLlm:
         return self.response
 
 
+class SequenceLlm:
+    def __init__(self, responses: list[str]) -> None:
+        self.responses = responses
+        self.messages: list[list[ConversationMessage]] = []
+
+    def generate(self, messages: list[ConversationMessage]) -> str:
+        self.messages.append(messages)
+        return self.responses.pop(0)
+
+
 def bigquery_settings() -> Settings:
     return Settings(
         rag_backend="bigquery-vector",
@@ -105,6 +115,50 @@ def test_rag_analysis_rejects_invalid_llm_json() -> None:
         service.analyze_transcript("Potrzebuje wizyty.")
 
 
+def test_rag_analysis_repairs_tool_call_like_invalid_output() -> None:
+    llm = SequenceLlm(
+        responses=[
+            '<tool_call> {"name": "schedule_appointment", "arguments": {"date": "2026-06-15"',
+            """
+            {
+              "visit_reason": "Bol glowy",
+              "procedure_hint": "Konsultacja POZ",
+              "preferred_time": "wtorek rano od 9",
+              "preferred_days": ["2026-06-16"],
+              "preferred_time_windows": [
+                {"date": "2026-06-16", "start_time": "09:00", "end_time": "12:00"}
+              ],
+              "excluded_days": [],
+              "specific_datetime": null,
+              "urgency": "standardowa",
+              "duration_minutes": 30,
+              "confidence": 0.83,
+              "requires_human_callback": false,
+              "explanation": "Jedna prosta sprawa i preferencja wtorku rano."
+            }
+            """,
+        ]
+    )
+    service = RagAnalysisService(
+        settings=Settings(demo_mode=False),
+        retriever=FakeRetriever(),
+        llm=llm,
+    )
+
+    intent = service.analyze(
+        transcript="Dzien dobry, boli mnie glowa, prosze o wtorek rano od godziny dziewiatej.",
+        availability_summary="- 2026-06-16 09:00 - 10:00",
+        today=date(2026, 6, 15),
+    )
+
+    assert intent.visit_reason == "Bol glowy"
+    assert intent.duration_minutes == 30
+    assert intent.preferred_days == ["2026-06-16"]
+    assert intent.preferred_time_windows[0].start_time == "09:00"
+    assert len(llm.messages) == 2
+    assert "Invalid previous output" in llm.messages[1][-1].content
+
+
 def test_prompt_builder_limits_context_size() -> None:
     builder = SchedulingPromptBuilder(max_context_characters=80)
     messages = builder.build_messages(
@@ -120,6 +174,22 @@ def test_prompt_builder_limits_context_size() -> None:
     assert "short rule" in messages[-1].content
     assert "2026-06-09 10:30 - 12:00" in messages[-1].content
     assert "second.md" not in messages[-1].content
+
+
+def test_prompt_builder_forbids_tool_calls_and_explains_morning_windows() -> None:
+    builder = SchedulingPromptBuilder(max_context_characters=4000)
+    messages = builder.build_messages(
+        transcript="Boli mnie glowa, wtorek rano od dziewiatej.",
+        retrieved_passages=[RetrievedPassage(content="Bol glowy: 30 minut.", source_path="rules.md")],
+        availability_summary="- 2026-06-16 09:00 - 10:00",
+        today="2026-06-15",
+    )
+
+    combined = "\n".join(message.content for message in messages)
+    assert "<tool_call>" in combined
+    assert "Do not call schedule_appointment" in combined
+    assert "09:00 to 12:00" in combined
+    assert "do not set specific_datetime" in combined
 
 
 def test_retriever_reports_missing_vector_store(tmp_path) -> None:

@@ -80,7 +80,7 @@ def _build_messages(
     availability_summary: str,
     today: date,
 ) -> list[ConversationMessage]:
-    system_prompt = """You are a Polish medical appointment scheduling assistant.
+    system_prompt = """You are a Polish medical appointment data extraction service.
 Extract structured scheduling data from the transcript.
 Do not diagnose the patient.
 Estimate visit duration only for calendar scheduling.
@@ -88,7 +88,9 @@ Use only these duration values: 30, 60, 90, 120.
 Keep patient-facing text in Polish.
 When the patient mentions a weekday in Polish, convert it to the matching date in the current clinic week.
 If the request is unclear, contradictory, unsafe, or cannot be scheduled automatically, set requires_human_callback=true.
-Return only valid JSON. Do not add markdown.
+You do not have tools and must never output tool calls, function calls, XML tags, markdown, or <tool_call>.
+Do not call schedule_appointment and do not book the appointment yourself.
+Return one compact JSON object matching the requested schema and nothing else.
 """
     user_prompt = f"""Today is {today.isoformat()}.
 
@@ -97,6 +99,11 @@ Available clinic windows:
 
 Patient transcript:
 {transcript}
+
+Interpretation rules:
+- If the patient says "rano" or "poranne", use a morning window from 09:00 to 12:00 unless a narrower range is explicit.
+- If the patient says "od godziny dziewiatej" or "od 9", use start_time "09:00" and do not set specific_datetime.
+- Set specific_datetime only when the patient asks for one exact time, for example "dokladnie o 9" or "konkretnie 9:00".
 
 Return JSON with exactly these keys:
 {{

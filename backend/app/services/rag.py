@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from app.core.settings import Settings, get_settings
 from app.models.appointment import AppointmentIntent
-from app.models.rag import RetrievedPassage
+from app.models.rag import ConversationMessage, RetrievedPassage
 from app.services.bielik import BielikLlmService
 from app.services.exceptions import RagAnalysisError
 from app.services.intent_postprocessing import apply_polish_weekday_sanity_checks
@@ -91,7 +91,17 @@ class RagAnalysisService:
             today=(today or date.today()).isoformat(),
         )
         raw_response = self.llm.generate(messages)
-        intent = _parse_appointment_intent(raw_response)
+        try:
+            intent = _parse_appointment_intent(raw_response)
+        except RagAnalysisError:
+            logger.warning("Initial Bielik appointment JSON was invalid; requesting JSON repair.")
+            raw_response = self.llm.generate(
+                _build_json_repair_messages(
+                    transcript=transcript,
+                    invalid_response=raw_response,
+                )
+            )
+            intent = _parse_appointment_intent(raw_response)
         intent = apply_polish_weekday_sanity_checks(intent, transcript, today or date.today())
         logger.info(
             "RAG analysis completed duration_minutes=%s urgency=%s sources=%s",
@@ -126,3 +136,34 @@ def _extract_json_object(text: str) -> str:
         return object_match.group(1)
 
     raise RagAnalysisError("Bielik response did not contain a JSON object.")
+
+
+def _build_json_repair_messages(
+    transcript: str,
+    invalid_response: str,
+) -> list[ConversationMessage]:
+    return [
+        ConversationMessage(
+            role="system",
+            content=(
+                "You repair invalid LLM output into one valid JSON object. "
+                "Do not use tools, markdown, XML tags, or explanations. "
+                "Return only JSON matching the appointment intent schema."
+            ),
+        ),
+        ConversationMessage(
+            role="user",
+            content=f"""Patient transcript:
+{transcript}
+
+Invalid previous output:
+{invalid_response[:3000]}
+
+Return exactly one JSON object with keys:
+visit_reason, procedure_hint, preferred_time, preferred_days, preferred_time_windows,
+excluded_days, specific_datetime, urgency, duration_minutes, confidence,
+requires_human_callback, explanation.
+Use duration_minutes as one of 30, 60, 90, 120.
+""",
+        ),
+    ]

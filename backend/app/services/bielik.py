@@ -85,6 +85,9 @@ class OllamaHttpBielikProvider:
                     "num_predict": self.settings.llm_max_new_tokens,
                 },
             }
+            if _expects_json_response(messages):
+                payload["format"] = "json"
+
             url = _join_url(self.settings.ollama_base_url, "/api/chat")
             headers = self._auth_headers()
             prompt_chars = sum(len(message.content) for message in messages)
@@ -268,6 +271,16 @@ def _extract_ollama_text(result: dict[str, Any]) -> str:
         raise LlmGenerationError("Ollama returned an unexpected response shape.") from exc
 
     return _strip_stop_markers(text.strip())
+
+
+def _expects_json_response(messages: list[ConversationMessage]) -> bool:
+    content = "\n".join(message.content for message in messages).lower()
+    return (
+        "return json" in content
+        or "return only valid json" in content
+        or "return exactly one json object" in content
+        or "return one compact json object" in content
+    )
 
 
 def _strip_stop_markers(text: str) -> str:

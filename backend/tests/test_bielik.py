@@ -64,6 +64,30 @@ def test_ollama_provider_posts_chat_payload_and_returns_content() -> None:
         {"role": "user", "content": "Cześć"},
     ]
     assert calls[0][1]["options"] == {"temperature": 0.3, "num_predict": 64}
+    assert "format" not in calls[0][1]
+
+
+def test_ollama_provider_requests_json_format_for_json_prompts() -> None:
+    calls: list[dict] = []
+
+    def fake_post(_url: str, payload: dict, _timeout: float, _headers: dict | None) -> dict:
+        calls.append(payload)
+        return {"message": {"content": '{"status": "ok"}'}}
+
+    service = BielikLlmService(
+        settings=Settings(llm_provider="ollama-http"),
+        ollama_post=fake_post,
+    )
+
+    response = service.generate(
+        [
+            ConversationMessage(role="system", content="Return only valid JSON."),
+            ConversationMessage(role="user", content="Return JSON with status."),
+        ]
+    )
+
+    assert response == '{"status": "ok"}'
+    assert calls[0]["format"] == "json"
 
 
 def test_ollama_provider_adds_google_id_token_header(monkeypatch) -> None:
